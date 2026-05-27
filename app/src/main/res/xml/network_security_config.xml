@@ -4,5 +4,7 @@
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">10.0.2.2</domain>
         <domain includeSubdomains="true">localhost</domain>
+        <!-- Host Docker / red local (HTTP); añade aquí otros nombres que uses en desarrollo -->
+        <domain includeSubdomains="true">orbix.docker</domain>
     </domain-config>
 </network-security-config>

@@ -15,20 +15,26 @@ Cliente mínimo en **Kotlin + Jetpack Compose** para probar el login JSON y la s
 
 ## Backend Orbix
 
-- **Login JSON (sin HTML):** `POST` con cuerpo JSON a  
-`{baseUrl}/index.php?r=/src/usuarios/app_login`  
-Campos: `username`, `password`, `esquema` (si no viene del entorno del servidor), `verification_code` (si el usuario tiene 2FA).
-- **Estado de sesión:** `GET` `{baseUrl}/index.php?r=/src/usuarios/app_session`  
-Respuesta `ContestarJson`: `data` puede ser string JSON; si `authenticated` es true, la cookie `PHPSESSID` enviada por OkHttp es válida para el resto de `/src/...`.
+Documentación API revisada para esta app: en el repo `orbix`, carpeta `docs/catalogo/` — guía [`_clientes_nativos.md`](../orbix/docs/catalogo/_clientes_nativos.md) e índice [`_endpoints_cliente_movil.md`](../orbix/docs/catalogo/_endpoints_cliente_movil.md).
 
-La app usa **OkHttp** con `JavaNetCookieJar` para guardar cookies en memoria.
+### URLs (normalizar base)
+
+La base en ajustes puede ser `http://host/orbix/public/index.php`. Las llamadas API usan la ruta directa **`…/orbix/src/…`** (se quitan `/index.php` y `/public` del path). Ver `buildSrcUrl()` en `OrbixApi.kt`.
+
+- **Login JSON:** `POST` con cuerpo JSON a `{base normalizada}/src/usuarios/app_login`  
+  Campos: `username`, `password`, `esquema` (si no viene del entorno del servidor), `verification_code` (si el usuario tiene 2FA).
+- **Estado de sesión:** `GET` `{base}/src/usuarios/app_session`  
+  Respuesta `ContestarJson`: `data` puede ser string JSON; si `authenticated` es true, la cookie `PHPSESSID` es válida para el resto de `/src/...`.
+- **Menú:** `GET` `{base}/src/menus/grupmenu_coleccion` (`data` anidado como objeto, no string).
+
+La app usa **OkHttp** con `InMemoryCookieJar` para guardar cookies en memoria.
 
 ### URL base en la app
 
-Introduce la base hasta `public` **sin barra final**, por ejemplo:
+Introduce la base hasta `index.php` **sin barra final**, por ejemplo:
 
-- `https://tu-servidor/org/public`
-- Emulador contra tu PC: `http://10.0.2.2:8080/ruta/public` (el alias `10.0.2.2` es el host del equipo desde el emulador).
+- `http://orbix.docker:8003/orbix/public/index.php`
+- Emulador contra tu PC: `http://10.0.2.2:8003/orbix/public/index.php`
 
 `network_security_config` permite HTTP claro solo hacia `10.0.2.2` y `localhost` para depuración; en producción usa HTTPS y reduce ese permiso.
 
