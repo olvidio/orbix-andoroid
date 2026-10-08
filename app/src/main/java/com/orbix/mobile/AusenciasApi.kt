@@ -111,6 +111,62 @@ fun fetchSacdAusencias(
     return SacdAusenciasResult(tiposDisponibles = tipos, rows = rows)
 }
 
+data class SacdAusenciaDraft(
+    val localKey: String,
+    val idEnc: Int,
+    val descEnc: String,
+    val idItem: Int,
+    val inicio: String,
+    val fin: String,
+    val dedicM: String = "",
+    val dedicT: String = "",
+    val dedicV: String = "",
+)
+
+fun SacdAusenciaRow.toDraft(index: Int): SacdAusenciaDraft = SacdAusenciaDraft(
+    localKey = "item-$idItem-$idEnc-$index",
+    idEnc = idEnc,
+    descEnc = descEnc,
+    idItem = idItem,
+    inicio = inicio.orEmpty(),
+    fin = fin.orEmpty(),
+    dedicM = dedicM,
+    dedicT = dedicT,
+    dedicV = dedicV,
+)
+
+/**
+ * Guarda ausencias (`inicio[]`, `fin[]`, `id_enc[]`, `id_item[]`).
+ * `id_item=0` inserta; fechas vacías en ítem existente eliminan.
+ */
+fun updateSacdAusencias(
+    client: OkHttpClient,
+    baseUrl: String,
+    idNom: String,
+    drafts: List<SacdAusenciaDraft>,
+): SrcMutationResult {
+    val toSend = drafts.filter { draft ->
+        draft.idItem != 0 || draft.inicio.isNotBlank() || draft.fin.isNotBlank()
+    }
+    val fields = mutableListOf(
+        "id_nom" to idNom,
+        "enc_num" to toSend.size.toString(),
+    )
+    toSend.forEachIndexed { i, draft ->
+        fields += "id_enc[$i]" to draft.idEnc.toString()
+        fields += "id_item[$i]" to draft.idItem.toString()
+        fields += "inicio[$i]" to draft.inicio.trim()
+        fields += "fin[$i]" to draft.fin.trim()
+    }
+    val body = postSrcFormFields(
+        client,
+        baseUrl,
+        "/src/encargossacd/sacd_ausencias_update",
+        fields,
+    )
+    return mutationResultFromEnvelope(body?.let { parseSrcEnvelope(it) })
+}
+
 /** Extrae `id_nom` de claves `iniciales#id_nom` del desplegable jefe de zona. */
 fun sacdKeyToIdNom(key: String): String {
     val parts = key.split('#')

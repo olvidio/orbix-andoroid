@@ -3,6 +3,7 @@ package com.orbix.mobile
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -37,7 +38,9 @@ fun AusenciasScreen(
 ) {
     var loadingPage by remember { mutableStateOf(true) }
     var loadingRows by remember { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var statusMsg by remember { mutableStateOf<String?>(null) }
 
     var jefeSacds by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var sacdOpciones by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -45,45 +48,74 @@ fun AusenciasScreen(
     var selectedSacdKey by remember { mutableStateOf<String?>(null) }
     var selectedFiltro by remember { mutableStateOf("n") }
     var historial by remember { mutableStateOf(false) }
-    var rows by remember { mutableStateOf<List<SacdAusenciaRow>>(emptyList()) }
+    var drafts by remember { mutableStateOf<List<SacdAusenciaDraft>>(emptyList()) }
+    var tiposDisponibles by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
     var filtroExpanded by remember { mutableStateOf(false) }
     var sacdExpanded by remember { mutableStateOf(false) }
+    var addTipoExpanded by remember { mutableStateOf(false) }
     var showFilters by remember { mutableStateOf(true) }
     var resultsLoaded by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
     val filtroLabels = filtroSacdLabels()
 
+    fun currentIdNom(): String? = when (mode) {
+        AusenciasMode.JefeZona -> selectedSacdKey?.let { sacdKeyToIdNom(it) }
+        AusenciasMode.SacdLista -> selectedSacdKey
+    }
+
     fun reloadAusencias() {
-        val idNom = when (mode) {
-            AusenciasMode.JefeZona -> selectedSacdKey?.let { sacdKeyToIdNom(it) }
-            AusenciasMode.SacdLista -> selectedSacdKey
-        } ?: return
+        val idNom = currentIdNom() ?: return
         scope.launch {
             loadingRows = true
             error = null
+            statusMsg = null
             try {
                 val data = withContext(Dispatchers.IO) {
                     fetchSacdAusencias(client, baseUrl, idNom, historial)
                 }
                 if (data == null) {
                     error = "No se pudo cargar (sacd_ausencias_get_data)."
-                    rows = emptyList()
+                    drafts = emptyList()
+                    tiposDisponibles = emptyMap()
                 } else {
-                    rows = data.rows
+                    tiposDisponibles = data.tiposDisponibles
+                    drafts = data.rows.mapIndexed { i, row -> row.toDraft(i) }
                     resultsLoaded = true
                     showFilters = false
                     if (data.rows.isEmpty()) {
                         error = if (historial) {
-                            "Sin ausencias registradas."
+                            "Sin ausencias registradas. Puedes añadir abajo."
                         } else {
-                            "Sin ausencias vigentes. Prueba «Ver anteriores»."
+                            "Sin ausencias vigentes. Prueba «Ver anteriores» o añade una."
                         }
                     }
                 }
             } finally {
                 loadingRows = false
+            }
+        }
+    }
+
+    fun saveAusencias() {
+        val idNom = currentIdNom() ?: return
+        scope.launch {
+            saving = true
+            error = null
+            statusMsg = null
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    updateSacdAusencias(client, baseUrl, idNom, drafts)
+                }
+                if (result.ok) {
+                    statusMsg = "Ausencias guardadas."
+                    reloadAusencias()
+                } else {
+                    error = result.message
+                }
+            } finally {
+                saving = false
             }
         }
     }
@@ -137,11 +169,12 @@ fun AusenciasScreen(
     }
 
     LaunchedEffect(baseUrl, mode) {
-        rows = emptyList()
+        drafts = emptyList()
         historial = false
         showFilters = true
         resultsLoaded = false
         selectedSacdKey = null
+        statusMsg = null
         reloadSacdList()
     }
 
@@ -173,7 +206,7 @@ fun AusenciasScreen(
             style = MaterialTheme.typography.titleMedium,
         )
         Text(
-            text = "Vista de consulta. Editar fechas u horarios solo en la web.",
+            text = "Edita fechas y guarda. Deja inicio y fin en blanco para borrar una fila.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -205,8 +238,9 @@ fun AusenciasScreen(
                 summary = filterSummary,
                 onShowFilters = {
                     showFilters = true
-                    rows = emptyList()
+                    drafts = emptyList()
                     error = null
+                    statusMsg = null
                 },
             )
         }
@@ -247,6 +281,9 @@ fun AusenciasScreen(
         error?.let {
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
+        statusMsg?.let {
+            Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+        }
 
         if (resultsLoaded && !showFilters) {
             TextButton(
@@ -254,9 +291,39 @@ fun AusenciasScreen(
                     historial = !historial
                     reloadAusencias()
                 },
-                enabled = selectedSacdKey != null && !loadingRows,
+                enabled = selectedSacdKey != null && !loadingRows && !saving,
             ) {
                 Text(if (historial) "Solo vigentes" else "Ver anteriores")
+            }
+
+            if (tiposDisponibles.isNotEmpty()) {
+                MisasDropdown(
+                    label = "Añadir ausencia / tarea",
+                    value = "",
+                    expanded = addTipoExpanded,
+                    onExpandedChange = { addTipoExpanded = it },
+                    options = tiposDisponibles.map { (id, label) -> id to label },
+                    onSelect = { idEnc ->
+                        val desc = tiposDisponibles[idEnc].orEmpty()
+                        drafts = drafts + SacdAusenciaDraft(
+                            localKey = "new-${System.currentTimeMillis()}-$idEnc",
+                            idEnc = idEnc.toIntOrNull() ?: 0,
+                            descEnc = desc,
+                            idItem = 0,
+                            inicio = "",
+                            fin = "",
+                        )
+                        error = null
+                    },
+                )
+            }
+
+            Button(
+                onClick = { saveAusencias() },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !saving && !loadingRows && drafts.isNotEmpty(),
+            ) {
+                Text(if (saving) "Guardando…" else "Guardar")
             }
         }
 
@@ -264,15 +331,25 @@ fun AusenciasScreen(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            items(rows, key = { "${it.idItem}-${it.idEnc}" }) { row ->
-                AusenciaRowCard(row)
+            items(drafts, key = { it.localKey }) { draft ->
+                AusenciaEditCard(
+                    draft = draft,
+                    enabled = !saving && !loadingRows,
+                    onChange = { updated ->
+                        drafts = drafts.map { if (it.localKey == updated.localKey) updated else it }
+                    },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun AusenciaRowCard(row: SacdAusenciaRow) {
+private fun AusenciaEditCard(
+    draft: SacdAusenciaDraft,
+    enabled: Boolean,
+    onChange: (SacdAusenciaDraft) -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -283,20 +360,39 @@ private fun AusenciaRowCard(row: SacdAusenciaRow) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(row.descEnc, style = MaterialTheme.typography.bodyLarge)
-            val fechas = listOfNotNull(
-                row.inicio?.let { "Inicio: $it" },
-                row.fin?.let { "Fin: $it" },
-            ).joinToString(" · ")
-            if (fechas.isNotEmpty()) {
-                Text(fechas, style = MaterialTheme.typography.bodyMedium)
+            Text(draft.descEnc, style = MaterialTheme.typography.bodyLarge)
+            if (draft.idItem == 0) {
+                Text(
+                    "Nueva (aún no guardada)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.tertiary,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                LocalDateField(
+                    label = "Inicio",
+                    value = draft.inicio,
+                    onValueChange = { onChange(draft.copy(inicio = it)) },
+                    modifier = Modifier.weight(1f),
+                    enabled = enabled,
+                )
+                LocalDateField(
+                    label = "Fin",
+                    value = draft.fin,
+                    onValueChange = { onChange(draft.copy(fin = it)) },
+                    modifier = Modifier.weight(1f),
+                    enabled = enabled,
+                )
             }
             val horario = buildString {
-                if (row.dedicM.isNotEmpty()) append("M: ${row.dedicM} ")
-                if (row.dedicT.isNotEmpty()) append("T: ${row.dedicT} ")
-                if (row.dedicV.isNotEmpty()) append("V: ${row.dedicV}")
+                if (draft.dedicM.isNotEmpty()) append("M: ${draft.dedicM} ")
+                if (draft.dedicT.isNotEmpty()) append("T: ${draft.dedicT} ")
+                if (draft.dedicV.isNotEmpty()) append("V: ${draft.dedicV}")
             }.trim()
             if (horario.isNotEmpty()) {
                 Text(

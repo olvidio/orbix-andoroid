@@ -1,6 +1,7 @@
 package com.orbix.mobile
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,14 +10,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -26,7 +32,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
@@ -34,6 +46,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import java.util.Calendar
+import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,6 +89,120 @@ fun MisasDropdown(
     }
 }
 
+/**
+ * Campo de fecha local (`dd/MM/yyyy`) que abre un [DatePickerDialog] al pulsar.
+ * El icono de borrar deja el valor vacío (útil p. ej. en ausencias).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LocalDateField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier,
+) {
+    var showPicker by remember { mutableStateOf(false) }
+
+    Box(modifier = modifier) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            enabled = enabled,
+            label = { Text(label) },
+            placeholder = { Text("dd/mm/aaaa") },
+            trailingIcon = {
+                Row {
+                    if (value.isNotEmpty() && enabled) {
+                        IconButton(
+                            onClick = { onValueChange("") },
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Clear,
+                                contentDescription = "Borrar fecha",
+                            )
+                        }
+                    }
+                    Icon(
+                        imageVector = Icons.Filled.DateRange,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 12.dp),
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .padding(end = if (value.isNotEmpty()) 80.dp else 48.dp)
+                .clickable(enabled = enabled) { showPicker = true },
+        )
+    }
+
+    if (showPicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = parseLocalDateToUtcMillis(value)
+                ?: System.currentTimeMillis(),
+        )
+        DatePickerDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val millis = datePickerState.selectedDateMillis
+                        if (millis != null) {
+                            onValueChange(formatUtcMillisToLocalDate(millis))
+                        }
+                        showPicker = false
+                    },
+                ) {
+                    Text("Aceptar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPicker = false }) {
+                    Text("Cancelar")
+                }
+            },
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+}
+
+/** Parsea `d/m/yyyy`, `dd/mm/yyyy` o `yyyy-mm-dd` → medianoche UTC. */
+fun parseLocalDateToUtcMillis(raw: String): Long? {
+    val s = raw.trim().replace('-', '/')
+    if (s.isEmpty()) return null
+    val parts = s.split('/')
+    if (parts.size != 3) return null
+    val (day, month, year) = when {
+        parts[0].length == 4 -> Triple(parts[2].toIntOrNull(), parts[1].toIntOrNull(), parts[0].toIntOrNull())
+        else -> Triple(parts[0].toIntOrNull(), parts[1].toIntOrNull(), parts[2].toIntOrNull())
+    }
+    if (day == null || month == null || year == null) return null
+    if (day !in 1..31 || month !in 1..12 || year < 1000) return null
+    val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+    cal.clear()
+    cal.set(Calendar.YEAR, year)
+    cal.set(Calendar.MONTH, month - 1)
+    cal.set(Calendar.DAY_OF_MONTH, day)
+    return cal.timeInMillis
+}
+
+fun formatUtcMillisToLocalDate(millis: Long): String {
+    val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+    cal.timeInMillis = millis
+    val d = cal.get(Calendar.DAY_OF_MONTH)
+    val m = cal.get(Calendar.MONTH) + 1
+    val y = cal.get(Calendar.YEAR)
+    return "%02d/%02d/%04d".format(d, m, y)
+}
+
 @Composable
 fun MisasFilterSummaryBar(
     summary: String,
@@ -108,10 +236,14 @@ fun MisasLoadingBox() {
 }
 
 @Composable
-fun CuadriculaTable(grid: CuadriculaZona) {
+fun CuadriculaTable(
+    grid: CuadriculaZona,
+    editable: Boolean = false,
+    onCellClick: ((row: CuadriculaRow, date: String, meta: CuadriculaCellMeta) -> Unit)? = null,
+) {
     val horizontalScroll = rememberScrollState()
     val encargoWidth = 140.dp
-    val cellWidth = 56.dp
+    val cellWidth = if (editable) 64.dp else 56.dp
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -149,9 +281,20 @@ fun CuadriculaTable(grid: CuadriculaZona) {
                     )
                 }
                 grid.dateColumns.forEach { date ->
+                    val meta = row.metaByDate[date]
+                    val canEdit = editable && !row.isTitle && meta?.isEditable == true && onCellClick != null
                     Box(
                         modifier = Modifier
                             .width(cellWidth)
+                            .then(
+                                if (canEdit) {
+                                    Modifier
+                                        .clickable { onCellClick!!(row, date, meta!!) }
+                                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f))
+                                } else {
+                                    Modifier
+                                },
+                            )
                             .padding(6.dp),
                     ) {
                         Text(

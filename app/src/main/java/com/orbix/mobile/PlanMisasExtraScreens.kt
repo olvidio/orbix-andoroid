@@ -1,14 +1,25 @@
 package com.orbix.mobile
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -17,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -278,138 +290,46 @@ fun VerPlanCtrScreen(
 }
 
 @Composable
-fun EncargosZonaScreen(
-    client: OkHttpClient,
-    baseUrl: String,
-    contentPadding: PaddingValues,
-) {
-    ZonaOrdenListScreen(
-        client = client,
-        baseUrl = baseUrl,
-        contentPadding = contentPadding,
-        title = "Encargos de la zona",
-        loadPage = { fetchModificarEncargosPage(it.first, it.second) },
-        loadGrid = { c, u, z, o ->
-            fetchVerEncargosZona(c, u, idZona = z, orden = o)
-        },
-        columns = listOf("Encargo", "Tipo", "Lugar", "Orden"),
-        columnKeys = listOf("encargo", "tipo_encargo", "lugar", "orden"),
-        readOnlyNote = "Vista de consulta. Crear/editar encargos solo en la web.",
-    )
-}
-
-@Composable
-fun EncargosCentrosScreen(
-    client: OkHttpClient,
-    baseUrl: String,
-    contentPadding: PaddingValues,
-) {
-    ZonaOrdenListScreen(
-        client = client,
-        baseUrl = baseUrl,
-        contentPadding = contentPadding,
-        title = "Encargos visibles por centro",
-        loadPage = { fetchModificarEncargosCentrosPage(it.first, it.second) },
-        loadGrid = { c, u, z, _ -> fetchVerEncargosCentros(c, u, idZona = z) },
-        columns = listOf("Centro", "Encargo"),
-        columnKeys = listOf("centro", "encargo"),
-        showOrden = false,
-        readOnlyNote = "Vista de consulta. Edición solo en la web.",
-    )
-}
-
-@Composable
 fun InicialesZonaScreen(
     client: OkHttpClient,
     baseUrl: String,
     contentPadding: PaddingValues,
 ) {
-    ZonaOrdenListScreen(
-        client = client,
-        baseUrl = baseUrl,
-        contentPadding = contentPadding,
-        title = "Iniciales de sacerdotes",
-        loadPage = { fetchModificarInicialesPage(it.first, it.second) },
-        loadGrid = { c, u, z, _ -> fetchVerInicialesZona(c, u, idZona = z) },
-        columns = listOf("Nombre", "Iniciales", "Color"),
-        columnKeys = listOf("nombre_sacd", "iniciales", "color"),
-        showOrden = false,
-        readOnlyNote = "Vista de consulta. Editar iniciales solo en la web.",
-    )
-}
-
-@Composable
-private fun ZonaOrdenListScreen(
-    client: OkHttpClient,
-    baseUrl: String,
-    contentPadding: PaddingValues,
-    title: String,
-    loadPage: suspend (Pair<OkHttpClient, String>) -> ZonaOpcionesPage?,
-    loadGrid: suspend (OkHttpClient, String, String, String) -> Any?,
-    columns: List<String>,
-    columnKeys: List<String>,
-    showOrden: Boolean = true,
-    readOnlyNote: String? = null,
-) {
     var loadingPage by remember { mutableStateOf(true) }
     var loadingGrid by remember { mutableStateOf(false) }
+    var saving by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var statusMsg by remember { mutableStateOf<String?>(null) }
     var page by remember { mutableStateOf<ZonaOpcionesPage?>(null) }
-    var rows by remember { mutableStateOf<List<Map<String, String>>?>(null) }
+    var rows by remember { mutableStateOf<List<Map<String, String>>>(emptyList()) }
 
     var selectedZona by remember { mutableStateOf<String?>(null) }
-    var selectedOrden by remember { mutableStateOf("desc_enc") }
     var zonaExpanded by remember { mutableStateOf(false) }
-    var ordenExpanded by remember { mutableStateOf(false) }
     var showFilters by remember { mutableStateOf(true) }
 
-    val scope = rememberCoroutineScope()
+    var editingRow by remember { mutableStateOf<Map<String, String>?>(null) }
+    var editIniciales by remember { mutableStateOf("") }
+    var editColor by remember { mutableStateOf("") }
 
-    LaunchedEffect(baseUrl) {
-        loadingPage = true
-        rows = null
-        showFilters = true
-        try {
-            val data = withContext(Dispatchers.IO) { loadPage(client to baseUrl) }
-            if (data == null) {
-                error = "No se pudo cargar la pantalla."
-            } else if (data.error != null) {
-                error = data.error
-                page = data
-            } else if (data.zonasOpciones.isEmpty()) {
-                error = "No hay zonas disponibles."
-            } else {
-                page = data
-                selectedZona = data.zonasOpciones.keys.firstOrNull()
-                if (data.ordenOpciones.isNotEmpty()) {
-                    selectedOrden = data.ordenOpciones.keys.first()
-                }
-            }
-        } finally {
-            loadingPage = false
-        }
-    }
+    val scope = rememberCoroutineScope()
 
     fun buscar() {
         val zona = selectedZona ?: return
         scope.launch {
             loadingGrid = true
             error = null
+            statusMsg = null
             try {
                 val result = withContext(Dispatchers.IO) {
-                    loadGrid(client, baseUrl, zona, selectedOrden)
+                    fetchVerInicialesZona(client, baseUrl, idZona = zona)
                 }
-                when (result) {
-                    is EncargosZonaGrid -> rows = result.rows
-                    is EncargosCentrosGrid -> rows = result.rows
-                    is InicialesZonaGrid -> rows = result.rows
-                    else -> rows = null
-                }
-                if (rows == null) {
+                if (result == null) {
                     error = "No se pudo cargar los datos."
+                    rows = emptyList()
                 } else {
+                    rows = result.rows
                     showFilters = false
-                    if (rows!!.isEmpty()) error = "Sin registros."
+                    if (result.rows.isEmpty()) error = "Sin registros."
                 }
             } finally {
                 loadingGrid = false
@@ -417,12 +337,84 @@ private fun ZonaOrdenListScreen(
         }
     }
 
+    fun guardarIniciales() {
+        val row = editingRow ?: return
+        val idSacd = row["id_sacd"].orEmpty()
+        if (idSacd.isEmpty()) return
+        scope.launch {
+            saving = true
+            error = null
+            statusMsg = null
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    postUpdateIniciales(
+                        client,
+                        baseUrl,
+                        idSacd = idSacd,
+                        iniciales = editIniciales.trim(),
+                        color = editColor.trim(),
+                    )
+                }
+                if (result.ok) {
+                    val colorStored = normalizeInicialesColor(editColor)
+                    rows = rows.map {
+                        if (it["id_sacd"] == idSacd) {
+                            it.toMutableMap().apply {
+                                put("iniciales", editIniciales.trim())
+                                put("color", colorStored)
+                            }
+                        } else {
+                            it
+                        }
+                    }
+                    statusMsg = "Iniciales actualizadas."
+                    editingRow = null
+                } else {
+                    error = result.message
+                }
+            } finally {
+                saving = false
+            }
+        }
+    }
+
+    LaunchedEffect(baseUrl) {
+        loadingPage = true
+        rows = emptyList()
+        showFilters = true
+        editingRow = null
+        statusMsg = null
+        try {
+            val data = withContext(Dispatchers.IO) {
+                fetchModificarInicialesPage(client, baseUrl)
+            }
+            if (data == null) {
+                error = "No se pudo cargar la pantalla."
+            } else if (data.zonasOpciones.isEmpty()) {
+                error = "No hay zonas disponibles."
+                page = data
+            } else {
+                page = data
+                selectedZona = data.zonasOpciones.keys.firstOrNull()
+            }
+        } finally {
+            loadingPage = false
+        }
+    }
+
     Column(
-        modifier = Modifier.padding(contentPadding).padding(horizontal = 12.dp, vertical = 8.dp).fillMaxSize(),
+        modifier = Modifier
+            .padding(contentPadding)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(title, style = MaterialTheme.typography.titleMedium)
-        readOnlyNote?.let { MisasReadOnlyNote(it) }
+        Text("Iniciales de sacerdotes", style = MaterialTheme.typography.titleMedium)
+        Text(
+            text = "Toca una fila para editar iniciales y color.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         if (loadingPage) {
             MisasLoadingBox()
             return@Column
@@ -432,10 +424,15 @@ private fun ZonaOrdenListScreen(
             Text(error ?: "Sin datos", color = MaterialTheme.colorScheme.error)
             return@Column
         }
-        if (!showFilters && rows != null) {
+        if (!showFilters && rows.isNotEmpty()) {
             MisasFilterSummaryBar(
                 summary = zonas[selectedZona].orEmpty(),
-                onShowFilters = { showFilters = true },
+                onShowFilters = {
+                    showFilters = true
+                    rows = emptyList()
+                    error = null
+                    statusMsg = null
+                },
             )
         }
         if (showFilters) {
@@ -447,25 +444,150 @@ private fun ZonaOrdenListScreen(
                 options = zonas.map { (id, label) -> id to label },
                 onSelect = { selectedZona = it },
             )
-            if (showOrden && page?.ordenOpciones?.isNotEmpty() == true) {
-                MisasDropdown(
-                    label = "Orden",
-                    value = page!!.ordenOpciones[selectedOrden].orEmpty(),
-                    expanded = ordenExpanded,
-                    onExpandedChange = { ordenExpanded = it },
-                    options = page!!.ordenOpciones.map { (id, label) -> id to label },
-                    onSelect = { selectedOrden = it },
-                )
-            }
-            Button(onClick = { buscar() }, modifier = Modifier.fillMaxWidth(), enabled = !loadingGrid) {
+            Button(
+                onClick = { buscar() },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !loadingGrid,
+            ) {
                 Text("Ver listado")
             }
         }
         if (loadingGrid) MisasLoadingBox()
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
-        rows?.let {
-            if (it.isNotEmpty()) {
-                SimpleRowsTable(columns = columns, rows = it, columnKeys = columnKeys)
+        error?.let {
+            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        }
+        statusMsg?.let {
+            Text(it, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+        }
+        if (rows.isNotEmpty()) {
+            InicialesEditableList(
+                rows = rows,
+                onEdit = { row ->
+                    editingRow = row
+                    editIniciales = row["iniciales"].orEmpty()
+                    editColor = row["color"].orEmpty().let { c ->
+                        if (c.isNotEmpty() && !c.startsWith("#")) "#$c" else c
+                    }
+                    error = null
+                    statusMsg = null
+                },
+            )
+        }
+    }
+
+    editingRow?.let { row ->
+        AlertDialog(
+            onDismissRequest = { if (!saving) editingRow = null },
+            title = { Text(row["nombre_sacd"].orEmpty().ifEmpty { "Editar iniciales" }) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = editIniciales,
+                        onValueChange = { editIniciales = it },
+                        label = { Text("Iniciales") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !saving,
+                    )
+                    OutlinedTextField(
+                        value = editColor,
+                        onValueChange = { editColor = it },
+                        label = { Text("Color (#rrggbb)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !saving,
+                    )
+                    Text(
+                        "Paleta rápida",
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        INICIALES_COLOR_PRESETS.forEach { hex ->
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .background(
+                                        color = runCatching {
+                                            Color(android.graphics.Color.parseColor(hex))
+                                        }.getOrDefault(Color.Gray),
+                                        shape = MaterialTheme.shapes.small,
+                                    )
+                                    .clickable(enabled = !saving) { editColor = hex },
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { guardarIniciales() }, enabled = !saving) {
+                    Text(if (saving) "Guardando…" else "Guardar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingRow = null }, enabled = !saving) {
+                    Text("Cancelar")
+                }
+            },
+        )
+    }
+}
+
+private val INICIALES_COLOR_PRESETS = listOf(
+    "#000000", "#980000", "#ff0000", "#ff9900", "#00ff00",
+    "#4a86e8", "#0000ff", "#9900ff",
+)
+
+@Composable
+private fun InicialesEditableList(
+    rows: List<Map<String, String>>,
+    onEdit: (Map<String, String>) -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        items(rows.size) { index ->
+            val row = rows[index]
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onEdit(row) },
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                ),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    val colorHex = row["color"].orEmpty()
+                    val swatch = normalizeInicialesColor(colorHex)
+                    if (swatch.isNotEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .background(
+                                    color = runCatching {
+                                        Color(android.graphics.Color.parseColor("#$swatch"))
+                                    }.getOrDefault(Color.LightGray),
+                                    shape = MaterialTheme.shapes.small,
+                                ),
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            row["nombre_sacd"].orEmpty(),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(
+                            "Iniciales: ${row["iniciales"].orEmpty().ifEmpty { "—" }}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
         }
     }

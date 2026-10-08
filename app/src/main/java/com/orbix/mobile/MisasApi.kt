@@ -17,10 +17,26 @@ data class CuadriculaZona(
     val preferenceWarning: String? = null,
 )
 
+data class CuadriculaCellMeta(
+    val uuidItem: String,
+    val key: String,
+    val idEnc: String,
+    val dia: String,
+    val tstart: String,
+    val tend: String,
+    val observ: String,
+    val tipo: String,
+    val color: String = "",
+    val texto: String = "",
+) {
+    val isEditable: Boolean get() = tipo == "misas" && idEnc.isNotEmpty() && dia.isNotEmpty()
+}
+
 data class CuadriculaRow(
     val encargo: String,
     val isTitle: Boolean,
     val cells: Map<String, String>,
+    val metaByDate: Map<String, CuadriculaCellMeta> = emptyMap(),
 )
 
 data class CambiarStatusPantalla(
@@ -84,10 +100,19 @@ data class InicialesZonaGrid(
 
 data class EncargosZonaGrid(
     val rows: List<Map<String, String>>,
+    val tiposEncargo: Map<String, String> = emptyMap(),
+    val centros: Map<String, String> = emptyMap(),
+    val idiomas: Map<String, String> = emptyMap(),
 )
 
 data class EncargosCentrosGrid(
     val rows: List<Map<String, String>>,
+    val centrosZona: Map<String, String> = emptyMap(),
+)
+
+data class DesplegableOpciones(
+    val opciones: Map<String, String>,
+    val selected: String = "",
 )
 
 private val PERIODO_VER = linkedMapOf(
@@ -373,7 +398,12 @@ fun fetchVerEncargosZona(
         mapOf("id_zona" to idZona, "orden" to orden),
     ) ?: return null
     val data = parseContestarDataObject(body) ?: return null
-    return EncargosZonaGrid(rows = parseJsonRows(data.optJSONArray("rows")))
+    return EncargosZonaGrid(
+        rows = parseJsonRows(data.optJSONArray("rows")),
+        tiposEncargo = jsonObjectToStringMap(data.optJSONObject("tipos_encargo")),
+        centros = jsonObjectToStringMap(data.optJSONObject("centros")),
+        idiomas = jsonObjectToStringMap(data.optJSONObject("idiomas")),
+    )
 }
 
 fun fetchVerEncargosCentros(
@@ -388,7 +418,129 @@ fun fetchVerEncargosCentros(
         mapOf("id_zona" to idZona),
     ) ?: return null
     val data = parseContestarDataObject(body) ?: return null
-    return EncargosCentrosGrid(rows = parseJsonRows(data.optJSONArray("rows")))
+    return EncargosCentrosGrid(
+        rows = parseJsonRows(data.optJSONArray("rows")),
+        centrosZona = jsonObjectToStringMap(data.optJSONObject("a_centros_zona")),
+    )
+}
+
+fun fetchDesplegableEncargos(
+    client: OkHttpClient,
+    baseUrl: String,
+    idZona: String,
+    idEnc: String = "",
+): DesplegableOpciones? {
+    val body = postSrcForm(
+        client,
+        baseUrl,
+        "/src/misas/desplegable_encargos",
+        mapOf("id_zona" to idZona, "id_enc" to idEnc),
+    ) ?: return null
+    val data = parseContestarDataObject(body) ?: return null
+    return DesplegableOpciones(
+        opciones = parseOpcionesPairs(data.opt("opciones")),
+        selected = data.opt("selected")?.toString().orEmpty(),
+    )
+}
+
+fun postGuardarEncargoZona(
+    client: OkHttpClient,
+    baseUrl: String,
+    idZona: String,
+    idEnc: String,
+    idTipoEnc: String,
+    idUbi: String,
+    encargo: String,
+    orden: String,
+    prioridad: String,
+    descripcionLugar: String,
+    idiomaEnc: String,
+    observ: String,
+): SrcMutationResult {
+    val body = postSrcForm(
+        client,
+        baseUrl,
+        "/src/misas/guardar_encargo_zona",
+        mapOf(
+            "id_zona" to idZona,
+            "id_enc" to idEnc.ifEmpty { "0" },
+            "id_tipo_enc" to idTipoEnc,
+            "id_ubi" to idUbi,
+            "encargo" to encargo,
+            "orden" to orden,
+            "prioridad" to prioridad,
+            "descripcion_lugar" to descripcionLugar,
+            "idioma_enc" to idiomaEnc,
+            "observ" to observ,
+        ),
+    )
+    return mutationResultFromEnvelope(body?.let { parseSrcEnvelope(it) })
+}
+
+fun postEliminarEncargoZona(
+    client: OkHttpClient,
+    baseUrl: String,
+    idEnc: String,
+): SrcMutationResult {
+    val body = postSrcForm(
+        client,
+        baseUrl,
+        "/src/misas/eliminar_encargo_zona",
+        mapOf("id_enc" to idEnc),
+    )
+    return mutationResultFromEnvelope(body?.let { parseSrcEnvelope(it) })
+}
+
+fun postGuardarEncargoCentro(
+    client: OkHttpClient,
+    baseUrl: String,
+    idItem: String,
+    idEnc: String,
+    idCtr: String,
+): SrcMutationResult {
+    val body = postSrcForm(
+        client,
+        baseUrl,
+        "/src/misas/guardar_encargo_centro",
+        mapOf(
+            "id_item" to idItem,
+            "id_enc" to idEnc,
+            "id_ctr" to idCtr,
+        ),
+    )
+    return mutationResultFromEnvelope(body?.let { parseSrcEnvelope(it) })
+}
+
+fun postEliminarEncargoCentro(
+    client: OkHttpClient,
+    baseUrl: String,
+    idItem: String,
+): SrcMutationResult {
+    val body = postSrcForm(
+        client,
+        baseUrl,
+        "/src/misas/eliminar_encargo_centro",
+        mapOf("id_item" to idItem),
+    )
+    return mutationResultFromEnvelope(body?.let { parseSrcEnvelope(it) })
+}
+
+/** `opciones` como objeto `{id: label}` o lista `[[id, label], …]` (OpcionesDesplegable). */
+private fun parseOpcionesPairs(raw: Any?): Map<String, String> {
+    return when (raw) {
+        is JSONObject -> jsonObjectToStringMap(raw)
+        is JSONArray -> {
+            val out = linkedMapOf<String, String>()
+            for (i in 0 until raw.length()) {
+                val pair = raw.optJSONArray(i) ?: continue
+                if (pair.length() >= 2) {
+                    out[pair.opt(0)?.toString().orEmpty()] = pair.opt(1)?.toString().orEmpty()
+                }
+            }
+            out
+        }
+        else -> emptyMap()
+    }
 }
 
 fun fetchVerInicialesZona(
@@ -404,6 +556,218 @@ fun fetchVerInicialesZona(
     ) ?: return null
     val data = parseContestarDataObject(body) ?: return null
     return InicialesZonaGrid(rows = parseJsonRows(data.optJSONArray("rows")))
+}
+
+/** Cambia masivamente el estado del plan de misas de una zona/periodo. */
+fun postNuevoStatus(
+    client: OkHttpClient,
+    baseUrl: String,
+    idZona: String,
+    periodo: String,
+    estado: String,
+    empiezaMin: String = "",
+    empiezaMax: String = "",
+): SrcMutationResult {
+    val body = postSrcForm(
+        client,
+        baseUrl,
+        "/src/misas/nuevo_status",
+        mapOf(
+            "id_zona" to idZona,
+            "periodo" to periodo,
+            "estado" to estado,
+            "empiezamin" to empiezaMin,
+            "empiezamax" to empiezaMax,
+        ),
+    )
+    return mutationResultFromEnvelope(body?.let { parseSrcEnvelope(it) })
+}
+
+/** Inserta/actualiza iniciales y color de un sacerdote. Color: hex 6 chars sin `#`. */
+fun postUpdateIniciales(
+    client: OkHttpClient,
+    baseUrl: String,
+    idSacd: String,
+    iniciales: String,
+    color: String,
+): SrcMutationResult {
+    val body = postSrcForm(
+        client,
+        baseUrl,
+        "/src/misas/update_iniciales",
+        mapOf(
+            "id_sacd" to idSacd,
+            "iniciales" to iniciales,
+            "color" to normalizeInicialesColor(color),
+        ),
+    )
+    return mutationResultFromEnvelope(body?.let { parseSrcEnvelope(it) })
+}
+
+fun normalizeInicialesColor(raw: String): String {
+    var s = raw.trim()
+    if (s.startsWith("#")) s = s.drop(1)
+    if (s.length == 3 && s.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }) {
+        s = "${s[0]}${s[0]}${s[1]}${s[1]}${s[2]}${s[2]}"
+    }
+    return if (s.length == 6 && s.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }) {
+        s.lowercase()
+    } else {
+        ""
+    }
+}
+
+fun fetchDesplegableSacd(
+    client: OkHttpClient,
+    baseUrl: String,
+    idZona: String,
+    dia: String,
+    idSacd: String = "0",
+    seleccion: String = "2",
+): DesplegableOpciones? {
+    val body = postSrcForm(
+        client,
+        baseUrl,
+        "/src/misas/desplegable_sacd",
+        mapOf(
+            "id_zona" to idZona,
+            "dia" to dia,
+            "id_sacd" to idSacd.ifEmpty { "0" },
+            "seleccion" to seleccion,
+        ),
+    ) ?: return null
+    val data = parseContestarDataObject(body) ?: return null
+    val fromPairs = parseOpcionesPairs(data.opt("opciones"))
+    val fromRows = parseValueLabelRows(data.optJSONArray("rows"))
+    val opciones = fromPairs.ifEmpty { fromRows }
+    return DesplegableOpciones(
+        opciones = opciones,
+        selected = data.opt("selected")?.toString().orEmpty(),
+    )
+}
+
+fun postCuadriculaUpdate(
+    client: OkHttpClient,
+    baseUrl: String,
+    uuidItem: String,
+    key: String,
+    idEnc: String,
+    dia: String,
+    tstart: String,
+    tend: String,
+    observ: String,
+    tipoPlantilla: String,
+    idZona: String,
+): SrcMutationResult {
+    val body = postSrcForm(
+        client,
+        baseUrl,
+        "/src/misas/cuadricula_update",
+        mapOf(
+            "uuid_item" to uuidItem,
+            "key" to key,
+            "id_enc" to idEnc,
+            "dia" to dia,
+            "tstart" to tstart,
+            "tend" to tend,
+            "observ" to observ,
+            "tipo_plantilla" to tipoPlantilla,
+            "id_zona" to idZona,
+        ),
+    )
+    return mutationResultFromEnvelope(body?.let { parseSrcEnvelope(it) })
+}
+
+data class CrearPeriodoResult(
+    val ok: Boolean,
+    val message: String,
+    val grid: CuadriculaZona? = null,
+)
+
+fun postCrearNuevoPeriodo(
+    client: OkHttpClient,
+    baseUrl: String,
+    idZona: String,
+    tipoPlantilla: String,
+    periodo: String,
+    orden: String,
+    empiezaMin: String = "",
+    empiezaMax: String = "",
+    seleccion: String = "0",
+): CrearPeriodoResult {
+    val body = postSrcForm(
+        client,
+        baseUrl,
+        "/src/misas/crear_nuevo_periodo_data",
+        mapOf(
+            "id_zona" to idZona,
+            "tipo_plantilla" to tipoPlantilla,
+            "periodo" to periodo,
+            "orden" to orden,
+            "empiezamin" to empiezaMin,
+            "empiezamax" to empiezaMax,
+            "seleccion" to seleccion,
+        ),
+    )
+    val env = body?.let { parseSrcEnvelope(it) }
+    val mutation = mutationResultFromEnvelope(env)
+    if (!mutation.ok) {
+        return CrearPeriodoResult(ok = false, message = mutation.message)
+    }
+    val grid = env?.dataObject?.let { parseCuadriculaZona(it) }
+    return CrearPeriodoResult(ok = true, message = "", grid = grid)
+}
+
+fun postImportarPlantilla(
+    client: OkHttpClient,
+    baseUrl: String,
+    idZona: String,
+    tipoOrigen: String,
+    tipoDestino: String,
+): SrcMutationResult {
+    val body = postSrcForm(
+        client,
+        baseUrl,
+        "/src/misas/importar_plantilla_data",
+        mapOf(
+            "id_zona" to idZona,
+            "tipo_plantilla_origen" to tipoOrigen,
+            "tipo_plantilla_destino" to tipoDestino,
+        ),
+    )
+    return mutationResultFromEnvelope(body?.let { parseSrcEnvelope(it) })
+}
+
+/** En carga a veces viene `id_nom#iniciales`; al guardar debe ser `iniciales#id_nom`. */
+fun normalizeSacdKeyForUpdate(key: String): String {
+    val parts = key.split('#')
+    if (parts.size == 2 && parts[0].all { it.isDigit() } && parts[0].isNotEmpty()) {
+        return "${parts[1]}#${parts[0]}"
+    }
+    return key
+}
+
+fun idNomFromSacdKey(key: String): String {
+    val parts = key.split('#')
+    if (parts.size != 2) return "0"
+    return when {
+        parts[0].all { it.isDigit() } -> parts[0]
+        parts[1].all { it.isDigit() } -> parts[1]
+        else -> "0"
+    }
+}
+
+fun ensureEncargoDiaUuid(uuid: String): String =
+    uuid.ifBlank { java.util.UUID.randomUUID().toString() }
+
+private fun parseValueLabelRows(arr: JSONArray?): Map<String, String> {
+    if (arr == null) return emptyMap()
+    val out = linkedMapOf<String, String>()
+    for (i in 0 until arr.length()) {
+        val obj = arr.optJSONObject(i) ?: continue
+        out[obj.opt("value")?.toString().orEmpty()] = obj.optString("label", "")
+    }
+    return out
 }
 
 private fun parseJsonRows(arr: JSONArray?): List<Map<String, String>> {
@@ -454,6 +818,34 @@ private fun parseCuadriculaZona(data: JSONObject): CuadriculaZona {
         val encargo = row.optString("encargo", "")
         val isTitle = row.optString("color_encargo", "") == "titulo"
         val cells = linkedMapOf<String, String>()
+        val metaByDate = linkedMapOf<String, CuadriculaCellMeta>()
+        val metaObj = when (val rawMeta = row.opt("meta")) {
+            is JSONObject -> rawMeta
+            is String -> runCatching { JSONObject(rawMeta) }.getOrNull()
+            else -> null
+        }
+        if (metaObj != null) {
+            val metaKeys = metaObj.keys()
+            while (metaKeys.hasNext()) {
+                val date = metaKeys.next()
+                val cellMeta = metaObj.optJSONObject(date) ?: continue
+                metaByDate[date] = CuadriculaCellMeta(
+                    uuidItem = cellMeta.optString("uuid_item", ""),
+                    key = cellMeta.optString("key", ""),
+                    idEnc = cellMeta.opt("id_enc")?.toString().orEmpty(),
+                    dia = cellMeta.optString("dia", date),
+                    tstart = cellMeta.optString("tstart", ""),
+                    tend = cellMeta.optString("tend", ""),
+                    observ = cellMeta.optString("observ", ""),
+                    tipo = cellMeta.optString("tipo", ""),
+                    color = cellMeta.optString("color", ""),
+                    texto = cellMeta.optString("texto", ""),
+                )
+                if (date.matches(DATE_COLUMN_REGEX)) {
+                    dateColumns.add(date)
+                }
+            }
+        }
         val keys = row.keys()
         while (keys.hasNext()) {
             val key = keys.next()
@@ -464,7 +856,14 @@ private fun parseCuadriculaZona(data: JSONObject): CuadriculaZona {
                 dateColumns.add(key)
             }
         }
-        parsedRows.add(CuadriculaRow(encargo = encargo, isTitle = isTitle, cells = cells))
+        parsedRows.add(
+            CuadriculaRow(
+                encargo = encargo,
+                isTitle = isTitle,
+                cells = cells,
+                metaByDate = metaByDate,
+            ),
+        )
     }
 
     return CuadriculaZona(

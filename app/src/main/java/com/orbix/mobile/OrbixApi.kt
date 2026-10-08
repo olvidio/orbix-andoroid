@@ -313,19 +313,57 @@ private fun parseMenuOrder(arr: JSONArray?): List<Int> {
 /** Objeto `data` del envelope ContestarJson (`data` puede ser string JSON u objeto). */
 internal fun parseContestarDataObject(body: String): JSONObject? {
     return try {
+        val env = parseSrcEnvelope(body) ?: return null
+        if (!env.success) null else env.dataObject
+    } catch (_: Exception) {
+        null
+    }
+}
+
+/** Envelope ContestarJson completo (éxito o error de mutación). */
+internal data class SrcEnvelope(
+    val success: Boolean,
+    val mensaje: String,
+    val dataObject: JSONObject?,
+    val dataText: String,
+)
+
+internal fun parseSrcEnvelope(body: String): SrcEnvelope? {
+    return try {
         val root = JSONObject(body)
-        if (!root.optBoolean("success", false)) {
-            null
-        } else {
-            when (val raw = root.opt("data")) {
-                is String -> if (raw.isEmpty()) null else JSONObject(raw)
-                is JSONObject -> raw
-                else -> null
+        val success = root.optBoolean("success", false)
+        val mensaje = root.optString("mensaje", "")
+        when (val raw = root.opt("data")) {
+            is JSONObject -> SrcEnvelope(success, mensaje, raw, "")
+            is String -> {
+                if (raw.isEmpty()) {
+                    SrcEnvelope(success, mensaje, null, "")
+                } else {
+                    val asObj = runCatching { JSONObject(raw) }.getOrNull()
+                    SrcEnvelope(success, mensaje, asObj, raw)
+                }
             }
+            else -> SrcEnvelope(success, mensaje, null, "")
         }
     } catch (_: Exception) {
         null
     }
+}
+
+data class SrcMutationResult(
+    val ok: Boolean,
+    val message: String,
+)
+
+internal fun mutationResultFromEnvelope(env: SrcEnvelope?): SrcMutationResult {
+    if (env == null) {
+        return SrcMutationResult(ok = false, message = "Sin respuesta del servidor.")
+    }
+    if (env.success) {
+        return SrcMutationResult(ok = true, message = "")
+    }
+    val detail = env.dataText.ifBlank { env.mensaje }.ifBlank { "Error al guardar." }
+    return SrcMutationResult(ok = false, message = detail.trim())
 }
 
 internal fun postSrcForm(
@@ -333,6 +371,14 @@ internal fun postSrcForm(
     baseUrl: String,
     route: String,
     fields: Map<String, String>,
+): String? = postSrcFormFields(client, baseUrl, route, fields.map { it.key to it.value })
+
+/** POST form-urlencoded; permite claves repetidas o indexadas (`inicio[0]`, …). */
+internal fun postSrcFormFields(
+    client: OkHttpClient,
+    baseUrl: String,
+    route: String,
+    fields: List<Pair<String, String>>,
 ): String? {
     val url = buildSrcUrl(baseUrl.trim(), route) ?: return null
     val body = FormBody.Builder().apply {
@@ -340,7 +386,8 @@ internal fun postSrcForm(
     }.build()
     val req = Request.Builder().url(url).headerAcceptSrcJson().post(body).build()
     return client.newCall(req).execute().use { response ->
-        if (!response.isSuccessful) null else response.body?.string()
+        // ContestarJson puede devolver 4xx con cuerpo JSON de error.
+        response.body?.string()
     }
 }
 
