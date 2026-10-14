@@ -27,6 +27,7 @@ data class SacdAusenciaRow(
 data class SacdAusenciasResult(
     val tiposDisponibles: Map<String, String>,
     val rows: List<SacdAusenciaRow>,
+    val ctxGuardar: String = "",
 )
 
 fun filtroSacdLabels(): Map<String, String> = linkedMapOf(
@@ -108,7 +109,12 @@ fun fetchSacdAusencias(
             ),
         )
     }
-    return SacdAusenciasResult(tiposDisponibles = tipos, rows = rows)
+    val ctxGuardar = data.optString("ctx_guardar", "")
+    return SacdAusenciasResult(
+        tiposDisponibles = tipos,
+        rows = rows,
+        ctxGuardar = ctxGuardar,
+    )
 }
 
 data class SacdAusenciaDraft(
@@ -143,6 +149,7 @@ fun updateSacdAusencias(
     client: OkHttpClient,
     baseUrl: String,
     idNom: String,
+    ctxGuardar: String,
     drafts: List<SacdAusenciaDraft>,
 ): SrcMutationResult {
     val toSend = drafts.filter { draft ->
@@ -150,6 +157,7 @@ fun updateSacdAusencias(
     }
     val fields = mutableListOf(
         "id_nom" to idNom,
+        "ctx_guardar" to ctxGuardar,
         "enc_num" to toSend.size.toString(),
     )
     toSend.forEachIndexed { i, draft ->

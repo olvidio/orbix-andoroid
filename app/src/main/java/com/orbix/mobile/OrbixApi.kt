@@ -360,9 +360,9 @@ internal fun mutationResultFromEnvelope(env: SrcEnvelope?): SrcMutationResult {
         return SrcMutationResult(ok = false, message = "Sin respuesta del servidor.")
     }
     if (env.success) {
-        return SrcMutationResult(ok = true, message = "")
+        return SrcMutationResult(ok = true, message = env.dataText.ifBlank { env.mensaje })
     }
-    val detail = env.dataText.ifBlank { env.mensaje }.ifBlank { "Error al guardar." }
+    val detail = env.mensaje.ifBlank { env.dataText }.ifBlank { "Error al guardar." }
     return SrcMutationResult(ok = false, message = detail.trim())
 }
 

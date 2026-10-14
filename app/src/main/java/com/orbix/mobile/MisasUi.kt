@@ -14,12 +14,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -33,7 +36,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,11 +46,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import java.time.LocalDate
 import java.util.Calendar
 import java.util.TimeZone
 
@@ -113,7 +120,7 @@ fun LocalDateField(
             label = { Text(label) },
             placeholder = { Text("dd/mm/aaaa") },
             trailingIcon = {
-                Row {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     if (value.isNotEmpty() && enabled) {
                         IconButton(
                             onClick = { onValueChange("") },
@@ -125,11 +132,15 @@ fun LocalDateField(
                             )
                         }
                     }
-                    Icon(
-                        imageVector = Icons.Filled.DateRange,
-                        contentDescription = null,
-                        modifier = Modifier.padding(end = 12.dp),
-                    )
+                    IconButton(
+                        onClick = { if (enabled) showPicker = true },
+                        enabled = enabled,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.DateRange,
+                            contentDescription = "Seleccionar fecha",
+                        )
+                    }
                 }
             },
             modifier = Modifier.fillMaxWidth(),
@@ -138,7 +149,7 @@ fun LocalDateField(
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .padding(end = if (value.isNotEmpty()) 80.dp else 48.dp)
+                .padding(end = if (value.isNotEmpty()) 88.dp else 48.dp)
                 .clickable(enabled = enabled) { showPicker = true },
         )
     }
@@ -203,6 +214,125 @@ fun formatUtcMillisToLocalDate(millis: Long): String {
     return "%02d/%02d/%04d".format(d, m, y)
 }
 
+/** Parsea `H:mm` o `HH:mm` (opcional `:ss`). */
+fun parseLocalTime(raw: String): Pair<Int, Int>? {
+    val s = raw.trim()
+    if (s.isEmpty()) return null
+    val parts = s.split(':')
+    if (parts.size < 2) return null
+    val hour = parts[0].toIntOrNull() ?: return null
+    val minute = parts[1].toIntOrNull() ?: return null
+    if (hour !in 0..23 || minute !in 0..59) return null
+    return hour to minute
+}
+
+fun formatLocalTime(hour: Int, minute: Int): String = "%02d:%02d".format(hour, minute)
+
+fun normalizeLocalTimeDisplay(raw: String): String {
+    val (h, m) = parseLocalTime(raw) ?: return raw.trim()
+    return formatLocalTime(h, m)
+}
+
+fun addMinutesToLocalTime(time: String, minutesToAdd: Int): String {
+    val (h, m) = parseLocalTime(time) ?: return ""
+    val totalMinutes = h * 60 + m + minutesToAdd
+    val wrapped = ((totalMinutes % (24 * 60)) + (24 * 60)) % (24 * 60)
+    return formatLocalTime(wrapped / 60, wrapped % 60)
+}
+
+/**
+ * Campo de hora (`HH:mm`) que abre un selector de hora al pulsar.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LocalTimeField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier,
+) {
+    var showPicker by remember { mutableStateOf(false) }
+    val displayValue = normalizeLocalTimeDisplay(value)
+
+    Box(modifier = modifier) {
+        OutlinedTextField(
+            value = displayValue,
+            onValueChange = {},
+            readOnly = true,
+            enabled = enabled,
+            label = { Text(label) },
+            placeholder = { Text("HH:mm") },
+            trailingIcon = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (displayValue.isNotEmpty() && enabled) {
+                        IconButton(
+                            onClick = { onValueChange("") },
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Clear,
+                                contentDescription = "Borrar hora",
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = { if (enabled) showPicker = true },
+                        enabled = enabled,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Schedule,
+                            contentDescription = "Seleccionar hora",
+                        )
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+        )
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .padding(end = if (displayValue.isNotEmpty()) 88.dp else 48.dp)
+                .clickable(enabled = enabled) { showPicker = true },
+        )
+    }
+
+    if (showPicker) {
+        val now = Calendar.getInstance()
+        val (initialHour, initialMinute) = parseLocalTime(value)
+            ?: (now.get(Calendar.HOUR_OF_DAY) to now.get(Calendar.MINUTE))
+        val timePickerState = rememberTimePickerState(
+            initialHour = initialHour,
+            initialMinute = initialMinute,
+            is24Hour = true,
+        )
+        AlertDialog(
+            onDismissRequest = { showPicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onValueChange(
+                            formatLocalTime(timePickerState.hour, timePickerState.minute),
+                        )
+                        showPicker = false
+                    },
+                ) {
+                    Text("Aceptar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPicker = false }) {
+                    Text("Cancelar")
+                }
+            },
+            text = {
+                TimePicker(state = timePickerState)
+            },
+        )
+    }
+}
+
 @Composable
 fun MisasFilterSummaryBar(
     summary: String,
@@ -240,38 +370,42 @@ fun CuadriculaTable(
     grid: CuadriculaZona,
     editable: Boolean = false,
     onCellClick: ((row: CuadriculaRow, date: String, meta: CuadriculaCellMeta) -> Unit)? = null,
+    modifier: Modifier = Modifier,
 ) {
     val horizontalScroll = rememberScrollState()
     val encargoWidth = 140.dp
     val cellWidth = if (editable) 64.dp else 56.dp
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(1.dp),
     ) {
-        item {
+        item(key = "cuadricula-header") {
             CuadriculaHeaderRow(
                 horizontalScroll = horizontalScroll,
                 encargoWidth = encargoWidth,
                 cellWidth = cellWidth,
                 dateColumns = grid.dateColumns,
+                columnHeaders = grid.columnHeaders,
             )
         }
-        items(grid.rows, key = { row -> "${row.encargo}_${row.isTitle}_${row.cells.hashCode()}" }) { row ->
-            val bg = if (row.isTitle) {
-                MaterialTheme.colorScheme.secondaryContainer
-            } else {
-                MaterialTheme.colorScheme.surface
-            }
+        itemsIndexed(grid.rows, key = { index, _ -> "cuadricula-row-$index" }) { _, row ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(horizontalScroll)
-                    .background(bg),
+                    .horizontalScroll(horizontalScroll),
             ) {
+                val encargoBg = cuadriculaCellBackground(row.encargoColorClass)
+                    ?: if (row.isTitle) {
+                        cuadriculaCellBackground("titulo")
+                            ?: MaterialTheme.colorScheme.surfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.surface
+                    }
                 Box(
                     modifier = Modifier
                         .width(encargoWidth)
+                        .background(encargoBg)
                         .padding(6.dp),
                 ) {
                     Text(
@@ -283,14 +417,22 @@ fun CuadriculaTable(
                 grid.dateColumns.forEach { date ->
                     val meta = row.metaByDate[date]
                     val canEdit = editable && !row.isTitle && meta?.isEditable == true && onCellClick != null
+                    val cellCss = meta?.color.orEmpty()
+                    val cellBg = cuadriculaCellBackground(cellCss)
+                        ?: if (canEdit) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
+                        } else if (row.isTitle) {
+                            cuadriculaCellBackground("titulo") ?: MaterialTheme.colorScheme.surfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        }
                     Box(
                         modifier = Modifier
                             .width(cellWidth)
+                            .background(cellBg)
                             .then(
                                 if (canEdit) {
-                                    Modifier
-                                        .clickable { onCellClick!!(row, date, meta!!) }
-                                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f))
+                                    Modifier.clickable { onCellClick!!(row, date, meta!!) }
                                 } else {
                                     Modifier
                                 },
@@ -311,12 +453,30 @@ fun CuadriculaTable(
     }
 }
 
+/** Colores de fondo de celdas como en la cuadrícula web (`modificar_cuadricula_zona.phtml`). */
+fun cuadriculaCellBackground(cssClass: String): Color? {
+    return when (cssClass.trim().lowercase()) {
+        "verdeclaro" -> Color(0xFFD1E7DD)
+        "verde" -> Color(0xFF00FF00)
+        "rojoclaro" -> Color(0xFFF8D7DA)
+        "rojo" -> Color(0xFFFF0000)
+        "amarilloclaro" -> Color(0xFFFFFFAA)
+        "amarillo" -> Color(0xFFFFFF00)
+        "violetaclaro" -> Color(0xFFE8A0E8)
+        "azulclaro2" -> Color(0xFF80E0E0)
+        "azulclaro" -> Color(0xFFA0F0F0)
+        "titulo" -> Color(0xFFF6F6F6)
+        else -> null
+    }
+}
+
 @Composable
 private fun CuadriculaHeaderRow(
     horizontalScroll: androidx.compose.foundation.ScrollState,
     encargoWidth: Dp,
     cellWidth: Dp,
     dateColumns: List<String>,
+    columnHeaders: Map<String, String>,
 ) {
     Row(
         modifier = Modifier
@@ -339,10 +499,11 @@ private fun CuadriculaHeaderRow(
                     .padding(6.dp),
             ) {
                 Text(
-                    text = formatMisasDateHeader(date),
+                    text = columnHeaders[date]?.takeIf { it.isNotEmpty() }
+                        ?: formatMisasDateHeader(date),
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.labelSmall,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -540,7 +701,14 @@ fun MisasReadOnlyNote(text: String) {
 }
 
 fun formatMisasDateHeader(isoDate: String): String {
-    val parts = isoDate.split("-")
-    if (parts.size != 3) return isoDate
-    return "${parts[2]}.${parts[1]}"
+    return runCatching {
+        val date = LocalDate.parse(isoDate)
+        val dow = listOf("L", "M", "X", "J", "V", "S", "D")[date.dayOfWeek.value - 1]
+        val day = date.dayOfMonth
+        val month = date.monthValue.toString().padStart(2, '0')
+        "$dow $day.$month"
+    }.getOrElse {
+        val parts = isoDate.split("-")
+        if (parts.size != 3) isoDate else "${parts[2]}.${parts[1]}"
+    }
 }

@@ -40,6 +40,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -89,14 +90,9 @@ private fun Modifier.tabToNextFocus(focusManager: FocusManager): Modifier =
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val cookieJar = InMemoryCookieJar()
-        val http = OkHttpClient.Builder().cookieJar(cookieJar)
-        if (BuildConfig.DEBUG) {
-            val logInterceptor = HttpLoggingInterceptor { line -> Log.d("OrbixHttp", line) }
-            logInterceptor.level = HttpLoggingInterceptor.Level.BODY
-            http.addInterceptor(logInterceptor)
-        }
-        val client = http.build()
+        val app = application as OrbixApplication
+        val cookieJar = app.cookieJar
+        val client = app.client
 
         setContent {
             MaterialTheme {
@@ -112,22 +108,26 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun OrbixApp(client: OkHttpClient, cookieJar: InMemoryCookieJar) {
     val context = LocalContext.current
-    var showSettings by remember { mutableStateOf(false) }
-    var baseUrl by remember { mutableStateOf("") }
-    var esquema by remember { mutableStateOf("") }
-    var isAuthenticated by remember { mutableStateOf(false) }
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+    var baseUrl by rememberSaveable { mutableStateOf("") }
+    var esquema by rememberSaveable { mutableStateOf("") }
+    var isAuthenticated by rememberSaveable { mutableStateOf(false) }
     var menuGroups by remember { mutableStateOf<List<GrupMenuItem>>(emptyList()) }
     var menusLoading by remember { mutableStateOf(false) }
-    var selectedGroupId by remember { mutableStateOf<String?>(null) }
-    var selectedMenu by remember { mutableStateOf<OrbixMenuItem?>(null) }
+    var selectedGroupId by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedMenuId by rememberSaveable { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+
+    val selectedGroup = menuGroups.find { it.id == selectedGroupId }
+    val selectedMenu = menuGroups.flatMap { it.menus }.find { it.id == selectedMenuId }
+    val singleMenuGroup = menuGroups.size == 1
 
     fun logout() {
         cookieJar.clear()
         isAuthenticated = false
         menuGroups = emptyList()
         selectedGroupId = null
-        selectedMenu = null
+        selectedMenuId = null
         showSettings = false
     }
 
@@ -164,7 +164,7 @@ private fun OrbixApp(client: OkHttpClient, cookieJar: InMemoryCookieJar) {
             isAuthenticated = false
             menuGroups = emptyList()
             selectedGroupId = null
-            selectedMenu = null
+            selectedMenuId = null
             return@LaunchedEffect
         }
         val sessionOk = withContext(Dispatchers.IO) {
@@ -187,12 +187,9 @@ private fun OrbixApp(client: OkHttpClient, cookieJar: InMemoryCookieJar) {
         } else {
             menuGroups = emptyList()
             selectedGroupId = null
-            selectedMenu = null
+            selectedMenuId = null
         }
     }
-
-    val selectedGroup = menuGroups.find { it.id == selectedGroupId }
-    val singleMenuGroup = menuGroups.size == 1
 
     LaunchedEffect(menuGroups) {
         if (menuGroups.size == 1) {
@@ -233,8 +230,8 @@ private fun OrbixApp(client: OkHttpClient, cookieJar: InMemoryCookieJar) {
     val sectionTitle = selectedGroup?.label
     val shellTitle = selectedMenu?.label ?: sectionTitle ?: "Orbix"
 
-    BackHandler(enabled = selectedMenu != null) {
-        selectedMenu = null
+    BackHandler(enabled = selectedMenuId != null) {
+        selectedMenuId = null
     }
 
     OrbixShell(
@@ -242,39 +239,39 @@ private fun OrbixApp(client: OkHttpClient, cookieJar: InMemoryCookieJar) {
         menuGroups = menuGroups,
         menusLoading = menusLoading,
         selectedGroupId = selectedGroupId,
-        selectedMenuId = selectedMenu?.id,
+        selectedMenuId = selectedMenuId,
         onSelectHome = {
             if (singleMenuGroup) {
-                selectedMenu = null
+                selectedMenuId = null
             } else {
                 selectedGroupId = null
-                selectedMenu = null
+                selectedMenuId = null
             }
         },
         onSelectGroup = { item ->
             selectedGroupId = item.id
-            selectedMenu = null
+            selectedMenuId = null
         },
         onSelectMenu = { item ->
             if (singleMenuGroup) {
                 selectedGroupId = menuGroups.first().id
             }
-            selectedMenu = item
+            selectedMenuId = item.id
         },
         onOpenSettings = { showSettings = true },
         onLogout = { logout() },
     ) { padding ->
         when {
-            selectedMenu != null && isMisasNativeScreen(nativeScreenFor(selectedMenu!!)) -> {
+            selectedMenu != null && isMisasNativeScreen(nativeScreenFor(selectedMenu)) -> {
                 MisasNativeScreen(
-                    screen = nativeScreenFor(selectedMenu!!),
+                    screen = nativeScreenFor(selectedMenu),
                     client = client,
                     baseUrl = baseUrl,
                     contentPadding = padding,
                 )
             }
             selectedMenu != null &&
-                nativeScreenFor(selectedMenu!!) == NativeMenuScreen.AtencionActividades -> {
+                nativeScreenFor(selectedMenu) == NativeMenuScreen.AtencionActividades -> {
                 AtencionActividadesScreen(
                     client = client,
                     baseUrl = baseUrl,
@@ -282,7 +279,7 @@ private fun OrbixApp(client: OkHttpClient, cookieJar: InMemoryCookieJar) {
                 )
             }
             selectedMenu != null &&
-                nativeScreenFor(selectedMenu!!) == NativeMenuScreen.PlanningZonas -> {
+                nativeScreenFor(selectedMenu) == NativeMenuScreen.PlanningZonas -> {
                 PlanningZonasScreen(
                     client = client,
                     baseUrl = baseUrl,
@@ -290,35 +287,35 @@ private fun OrbixApp(client: OkHttpClient, cookieJar: InMemoryCookieJar) {
                 )
             }
             selectedMenu != null &&
-                nativeScreenFor(selectedMenu!!) == NativeMenuScreen.Ausencias -> {
+                nativeScreenFor(selectedMenu) == NativeMenuScreen.Ausencias -> {
                 AusenciasScreen(
                     client = client,
                     baseUrl = baseUrl,
                     contentPadding = padding,
-                    mode = ausenciasModeForMenu(selectedMenu!!),
+                    mode = ausenciasModeForMenu(selectedMenu),
                 )
             }
             selectedMenu != null &&
-                nativeScreenFor(selectedMenu!!) == NativeMenuScreen.NuevoPlan -> {
+                nativeScreenFor(selectedMenu) == NativeMenuScreen.NuevoPlan -> {
                 NuevoPlanScreen(
                     client = client,
                     baseUrl = baseUrl,
                     contentPadding = padding,
-                    propuestaCalendario = isNuevoPlanPropuesta(selectedMenu!!),
+                    propuestaCalendario = isNuevoPlanPropuesta(selectedMenu),
                 )
             }
             selectedMenu != null -> {
                 UnimplementedMenuScreen(
                     contentPadding = padding,
-                    menu = selectedMenu!!,
-                    onBack = { selectedMenu = null },
+                    menu = selectedMenu,
+                    onBack = { selectedMenuId = null },
                 )
             }
             selectedGroup != null && !singleMenuGroup -> {
                 GroupMenuListScreen(
                     contentPadding = padding,
                     group = selectedGroup,
-                    onSelectMenu = { selectedMenu = it },
+                    onSelectMenu = { selectedMenuId = it.id },
                 )
             }
             else -> {

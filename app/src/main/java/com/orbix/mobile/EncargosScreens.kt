@@ -66,6 +66,8 @@ fun EncargosZonaScreen(
     var editDescLugar by remember { mutableStateOf("") }
     var editIdioma by remember { mutableStateOf("") }
     var editObserv by remember { mutableStateOf("") }
+    var editCtxGuardar by remember { mutableStateOf("") }
+    var editCtxEliminar by remember { mutableStateOf("") }
     var tipoExpanded by remember { mutableStateOf(false) }
     var ubiExpanded by remember { mutableStateOf(false) }
     var idiomaExpanded by remember { mutableStateOf(false) }
@@ -107,6 +109,8 @@ fun EncargosZonaScreen(
         editDescLugar = ""
         editIdioma = ""
         editObserv = ""
+        editCtxGuardar = grid?.ctxNuevo.orEmpty()
+        editCtxEliminar = ""
         editing = true
         error = null
         statusMsg = null
@@ -123,6 +127,8 @@ fun EncargosZonaScreen(
         editDescLugar = row["descripcion_lugar"].orEmpty()
         editIdioma = row["idioma_enc"].orEmpty()
         editObserv = row["observ"].orEmpty()
+        editCtxGuardar = row["ctx_guardar"].orEmpty()
+        editCtxEliminar = row["ctx_eliminar"].orEmpty()
         editing = true
         error = null
         statusMsg = null
@@ -130,6 +136,10 @@ fun EncargosZonaScreen(
 
     fun guardar() {
         val zona = selectedZona ?: return
+        if (editCtxGuardar.isBlank()) {
+            error = "No se pudo validar la operación. Vuelve a cargar la lista."
+            return
+        }
         scope.launch {
             saving = true
             error = null
@@ -149,6 +159,7 @@ fun EncargosZonaScreen(
                         descripcionLugar = editDescLugar,
                         idiomaEnc = editIdioma,
                         observ = editObserv,
+                        ctxGuardar = editCtxGuardar,
                     )
                 }
                 if (result.ok) {
@@ -169,13 +180,22 @@ fun EncargosZonaScreen(
             editing = false
             return
         }
+        if (editCtxEliminar.isBlank()) {
+            error = "No se pudo validar la operación. Vuelve a cargar la lista."
+            return
+        }
         scope.launch {
             saving = true
             error = null
             statusMsg = null
             try {
                 val result = withContext(Dispatchers.IO) {
-                    postEliminarEncargoZona(client, baseUrl, editIdEnc)
+                    postEliminarEncargoZona(
+                        client,
+                        baseUrl,
+                        idEnc = editIdEnc,
+                        ctxEliminar = editCtxEliminar,
+                    )
                 }
                 if (result.ok) {
                     statusMsg = "Encargo eliminado."
@@ -466,6 +486,8 @@ fun EncargosCentrosScreen(
     var editIdItem by remember { mutableStateOf("") }
     var editIdEnc by remember { mutableStateOf("") }
     var editIdCtr by remember { mutableStateOf("") }
+    var editCtxGuardar by remember { mutableStateOf("") }
+    var editCtxEliminar by remember { mutableStateOf("") }
     var encExpanded by remember { mutableStateOf(false) }
     var ctrExpanded by remember { mutableStateOf(false) }
 
@@ -515,6 +537,12 @@ fun EncargosCentrosScreen(
         editIdItem = ""
         editIdEnc = ""
         editIdCtr = ""
+        editCtxGuardar = grid?.ctxNuevo.orEmpty()
+        editCtxEliminar = ""
+        if (editCtxGuardar.isBlank()) {
+            error = "Vuelve a pulsar «Ver listado» antes de crear un vínculo."
+            return
+        }
         editing = true
         error = null
         statusMsg = null
@@ -526,6 +554,12 @@ fun EncargosCentrosScreen(
         editIdItem = row["id_item"].orEmpty()
         editIdEnc = row["id_encargo"].orEmpty()
         editIdCtr = row["id_centro"].orEmpty()
+        editCtxGuardar = row["ctx_guardar"].orEmpty()
+        editCtxEliminar = row["ctx_eliminar"].orEmpty()
+        if (editCtxGuardar.isBlank()) {
+            error = "Falta token de guardado. Pulsa «Ver listado» de nuevo."
+            return
+        }
         editing = true
         error = null
         statusMsg = null
@@ -537,6 +571,10 @@ fun EncargosCentrosScreen(
             error = "Falta encargo o centro."
             return
         }
+        if (editCtxGuardar.isBlank()) {
+            error = "No se pudo validar la operación. Vuelve a cargar la lista."
+            return
+        }
         scope.launch {
             saving = true
             error = null
@@ -546,9 +584,9 @@ fun EncargosCentrosScreen(
                     postGuardarEncargoCentro(
                         client,
                         baseUrl,
-                        idItem = editIdItem,
                         idEnc = editIdEnc,
                         idCtr = editIdCtr,
+                        ctxGuardar = editCtxGuardar,
                     )
                 }
                 if (result.ok) {
@@ -569,13 +607,21 @@ fun EncargosCentrosScreen(
             editing = false
             return
         }
+        if (editCtxEliminar.isBlank()) {
+            error = "No se pudo validar la operación. Vuelve a cargar la lista."
+            return
+        }
         scope.launch {
             saving = true
             error = null
             statusMsg = null
             try {
                 val result = withContext(Dispatchers.IO) {
-                    postEliminarEncargoCentro(client, baseUrl, editIdItem)
+                    postEliminarEncargoCentro(
+                        client,
+                        baseUrl,
+                        ctxEliminar = editCtxEliminar,
+                    )
                 }
                 if (result.ok) {
                     statusMsg = "Vínculo eliminado."
@@ -742,7 +788,10 @@ fun EncargosCentrosScreen(
             confirmButton = {
                 TextButton(
                     onClick = { guardar() },
-                    enabled = !saving && editIdEnc.isNotEmpty() && editIdCtr.isNotEmpty(),
+                    enabled = !saving &&
+                        editIdEnc.isNotEmpty() &&
+                        editIdCtr.isNotEmpty() &&
+                        editCtxGuardar.isNotEmpty(),
                 ) {
                     Text(if (saving) "Guardando…" else "Guardar")
                 }
@@ -750,7 +799,10 @@ fun EncargosCentrosScreen(
             dismissButton = {
                 Row {
                     if (!isNew) {
-                        TextButton(onClick = { eliminar() }, enabled = !saving) {
+                        TextButton(
+                            onClick = { eliminar() },
+                            enabled = !saving && editCtxEliminar.isNotEmpty(),
+                        ) {
                             Text("Eliminar", color = MaterialTheme.colorScheme.error)
                         }
                     }

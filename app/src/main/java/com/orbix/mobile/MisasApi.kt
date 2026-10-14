@@ -9,11 +9,17 @@ data class PlanDeMisasPantalla(
     val ordenOpciones: Map<String, String>,
     val tiposPlantilla: Map<String, String> = emptyMap(),
     val plantillaSelected: String? = null,
+    val ctxCrear: String = "",
+    val ctxImportar: String = "",
 )
 
 data class CuadriculaZona(
     val dateColumns: List<String>,
     val rows: List<CuadriculaRow>,
+    val columnHeaders: Map<String, String> = emptyMap(),
+    val ctxUpdate: String = "",
+    val estadosOpciones: Map<String, String> = emptyMap(),
+    val statusPropuesta: String = "1",
     val preferenceWarning: String? = null,
 )
 
@@ -25,6 +31,7 @@ data class CuadriculaCellMeta(
     val tstart: String,
     val tend: String,
     val observ: String,
+    val status: String = "",
     val tipo: String,
     val color: String = "",
     val texto: String = "",
@@ -37,6 +44,8 @@ data class CuadriculaRow(
     val isTitle: Boolean,
     val cells: Map<String, String>,
     val metaByDate: Map<String, CuadriculaCellMeta> = emptyMap(),
+    /** Clase CSS web (`color_encargo`: titulo, verde, …). */
+    val encargoColorClass: String = "",
 )
 
 data class CambiarStatusPantalla(
@@ -103,11 +112,13 @@ data class EncargosZonaGrid(
     val tiposEncargo: Map<String, String> = emptyMap(),
     val centros: Map<String, String> = emptyMap(),
     val idiomas: Map<String, String> = emptyMap(),
+    val ctxNuevo: String = "",
 )
 
 data class EncargosCentrosGrid(
     val rows: List<Map<String, String>>,
     val centrosZona: Map<String, String> = emptyMap(),
+    val ctxNuevo: String = "",
 )
 
 data class DesplegableOpciones(
@@ -153,6 +164,8 @@ fun fetchPlanDeMisasPantalla(
         ordenOpciones = jsonObjectToStringMap(data.optJSONObject("orden_opciones")),
         tiposPlantilla = jsonObjectToStringMap(data.optJSONObject("tipos_plantilla")),
         plantillaSelected = data.optString("plantilla_selected").takeIf { it.isNotEmpty() },
+        ctxCrear = data.optString("ctx_crear", ""),
+        ctxImportar = data.optString("ctx_importar", ""),
     )
 }
 
@@ -403,6 +416,7 @@ fun fetchVerEncargosZona(
         tiposEncargo = jsonObjectToStringMap(data.optJSONObject("tipos_encargo")),
         centros = jsonObjectToStringMap(data.optJSONObject("centros")),
         idiomas = jsonObjectToStringMap(data.optJSONObject("idiomas")),
+        ctxNuevo = data.optString("ctx_nuevo", ""),
     )
 }
 
@@ -421,6 +435,7 @@ fun fetchVerEncargosCentros(
     return EncargosCentrosGrid(
         rows = parseJsonRows(data.optJSONArray("rows")),
         centrosZona = jsonObjectToStringMap(data.optJSONObject("a_centros_zona")),
+        ctxNuevo = data.optString("ctx_nuevo", ""),
     )
 }
 
@@ -456,6 +471,7 @@ fun postGuardarEncargoZona(
     descripcionLugar: String,
     idiomaEnc: String,
     observ: String,
+    ctxGuardar: String,
 ): SrcMutationResult {
     val body = postSrcForm(
         client,
@@ -472,6 +488,7 @@ fun postGuardarEncargoZona(
             "descripcion_lugar" to descripcionLugar,
             "idioma_enc" to idiomaEnc,
             "observ" to observ,
+            "ctx_guardar" to ctxGuardar,
         ),
     )
     return mutationResultFromEnvelope(body?.let { parseSrcEnvelope(it) })
@@ -481,12 +498,16 @@ fun postEliminarEncargoZona(
     client: OkHttpClient,
     baseUrl: String,
     idEnc: String,
+    ctxEliminar: String,
 ): SrcMutationResult {
     val body = postSrcForm(
         client,
         baseUrl,
         "/src/misas/eliminar_encargo_zona",
-        mapOf("id_enc" to idEnc),
+        mapOf(
+            "id_enc" to idEnc,
+            "ctx_eliminar" to ctxEliminar,
+        ),
     )
     return mutationResultFromEnvelope(body?.let { parseSrcEnvelope(it) })
 }
@@ -494,18 +515,18 @@ fun postEliminarEncargoZona(
 fun postGuardarEncargoCentro(
     client: OkHttpClient,
     baseUrl: String,
-    idItem: String,
     idEnc: String,
     idCtr: String,
+    ctxGuardar: String,
 ): SrcMutationResult {
     val body = postSrcForm(
         client,
         baseUrl,
         "/src/misas/guardar_encargo_centro",
         mapOf(
-            "id_item" to idItem,
             "id_enc" to idEnc,
             "id_ctr" to idCtr,
+            "ctx_guardar" to ctxGuardar,
         ),
     )
     return mutationResultFromEnvelope(body?.let { parseSrcEnvelope(it) })
@@ -514,13 +535,15 @@ fun postGuardarEncargoCentro(
 fun postEliminarEncargoCentro(
     client: OkHttpClient,
     baseUrl: String,
-    idItem: String,
+    ctxEliminar: String,
 ): SrcMutationResult {
     val body = postSrcForm(
         client,
         baseUrl,
         "/src/misas/eliminar_encargo_centro",
-        mapOf("id_item" to idItem),
+        mapOf(
+            "ctx_eliminar" to ctxEliminar,
+        ),
     )
     return mutationResultFromEnvelope(body?.let { parseSrcEnvelope(it) })
 }
@@ -658,6 +681,8 @@ fun postCuadriculaUpdate(
     observ: String,
     tipoPlantilla: String,
     idZona: String,
+    ctxUpdate: String,
+    status: String = "",
 ): SrcMutationResult {
     val body = postSrcForm(
         client,
@@ -671,8 +696,10 @@ fun postCuadriculaUpdate(
             "tstart" to tstart,
             "tend" to tend,
             "observ" to observ,
+            "status" to status,
             "tipo_plantilla" to tipoPlantilla,
             "id_zona" to idZona,
+            "ctx_update" to ctxUpdate,
         ),
     )
     return mutationResultFromEnvelope(body?.let { parseSrcEnvelope(it) })
@@ -691,6 +718,7 @@ fun postCrearNuevoPeriodo(
     tipoPlantilla: String,
     periodo: String,
     orden: String,
+    ctxCrear: String,
     empiezaMin: String = "",
     empiezaMax: String = "",
     seleccion: String = "0",
@@ -704,6 +732,7 @@ fun postCrearNuevoPeriodo(
             "tipo_plantilla" to tipoPlantilla,
             "periodo" to periodo,
             "orden" to orden,
+            "ctx_crear" to ctxCrear,
             "empiezamin" to empiezaMin,
             "empiezamax" to empiezaMax,
             "seleccion" to seleccion,
@@ -724,6 +753,7 @@ fun postImportarPlantilla(
     idZona: String,
     tipoOrigen: String,
     tipoDestino: String,
+    ctxImportar: String,
 ): SrcMutationResult {
     val body = postSrcForm(
         client,
@@ -733,6 +763,7 @@ fun postImportarPlantilla(
             "id_zona" to idZona,
             "tipo_plantilla_origen" to tipoOrigen,
             "tipo_plantilla_destino" to tipoDestino,
+            "ctx_importar" to ctxImportar,
         ),
     )
     return mutationResultFromEnvelope(body?.let { parseSrcEnvelope(it) })
@@ -808,15 +839,34 @@ private fun jsonObjectToIntKeyStringMap(obj: JSONObject?): Map<String, String> {
     return out
 }
 
+private fun parseColumnsCuadricula(raw: String): Map<String, String> {
+    if (raw.isBlank() || raw == "[]") return emptyMap()
+    return runCatching {
+        val arr = JSONArray(raw)
+        val out = linkedMapOf<String, String>()
+        for (i in 0 until arr.length()) {
+            val col = arr.optJSONObject(i) ?: continue
+            val field = col.optString("field", "")
+            val name = col.optString("name", field)
+            if (field.matches(DATE_COLUMN_REGEX)) {
+                out[field] = name
+            }
+        }
+        out
+    }.getOrDefault(emptyMap())
+}
+
 private fun parseCuadriculaZona(data: JSONObject): CuadriculaZona {
     val rawRows = data.optJSONArray("data_cuadricula") ?: JSONArray()
+    val columnHeaders = parseColumnsCuadricula(data.optString("columns_cuadricula", ""))
     val parsedRows = mutableListOf<CuadriculaRow>()
     val dateColumns = linkedSetOf<String>()
 
     for (i in 0 until rawRows.length()) {
         val row = rawRows.optJSONObject(i) ?: continue
         val encargo = row.optString("encargo", "")
-        val isTitle = row.optString("color_encargo", "") == "titulo"
+        val colorEncargo = row.optString("color_encargo", "")
+        val isTitle = colorEncargo == "titulo"
         val cells = linkedMapOf<String, String>()
         val metaByDate = linkedMapOf<String, CuadriculaCellMeta>()
         val metaObj = when (val rawMeta = row.opt("meta")) {
@@ -837,6 +887,7 @@ private fun parseCuadriculaZona(data: JSONObject): CuadriculaZona {
                     tstart = cellMeta.optString("tstart", ""),
                     tend = cellMeta.optString("tend", ""),
                     observ = cellMeta.optString("observ", ""),
+                    status = cellMeta.opt("status")?.toString().orEmpty(),
                     tipo = cellMeta.optString("tipo", ""),
                     color = cellMeta.optString("color", ""),
                     texto = cellMeta.optString("texto", ""),
@@ -862,6 +913,7 @@ private fun parseCuadriculaZona(data: JSONObject): CuadriculaZona {
                 isTitle = isTitle,
                 cells = cells,
                 metaByDate = metaByDate,
+                encargoColorClass = colorEncargo,
             ),
         )
     }
@@ -869,6 +921,11 @@ private fun parseCuadriculaZona(data: JSONObject): CuadriculaZona {
     return CuadriculaZona(
         dateColumns = dateColumns.sorted(),
         rows = parsedRows,
+        columnHeaders = columnHeaders,
+        ctxUpdate = data.optString("ctx_update", ""),
+        estadosOpciones = parseOpcionesPairs(data.opt("estados_opciones")),
+        statusPropuesta = data.opt("status_propuesta")?.toString()?.takeIf { it.isNotEmpty() }
+            ?: "1",
         preferenceWarning = data.optString("preference_warning").takeIf { it.isNotEmpty() },
     )
 }

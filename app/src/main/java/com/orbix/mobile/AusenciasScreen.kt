@@ -1,6 +1,7 @@
 package com.orbix.mobile
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -50,14 +52,17 @@ fun AusenciasScreen(
     var historial by remember { mutableStateOf(false) }
     var drafts by remember { mutableStateOf<List<SacdAusenciaDraft>>(emptyList()) }
     var tiposDisponibles by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var ctxGuardar by remember { mutableStateOf("") }
 
     var filtroExpanded by remember { mutableStateOf(false) }
     var sacdExpanded by remember { mutableStateOf(false) }
     var addTipoExpanded by remember { mutableStateOf(false) }
     var showFilters by remember { mutableStateOf(true) }
     var resultsLoaded by remember { mutableStateOf(false) }
+    var scrollToNewAusencia by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
     val filtroLabels = filtroSacdLabels()
 
     fun currentIdNom(): String? = when (mode) {
@@ -65,12 +70,14 @@ fun AusenciasScreen(
         AusenciasMode.SacdLista -> selectedSacdKey
     }
 
-    fun reloadAusencias() {
+    fun reloadAusencias(keepStatusMsg: Boolean = false) {
         val idNom = currentIdNom() ?: return
         scope.launch {
             loadingRows = true
             error = null
-            statusMsg = null
+            if (!keepStatusMsg) {
+                statusMsg = null
+            }
             try {
                 val data = withContext(Dispatchers.IO) {
                     fetchSacdAusencias(client, baseUrl, idNom, historial)
@@ -79,9 +86,11 @@ fun AusenciasScreen(
                     error = "No se pudo cargar (sacd_ausencias_get_data)."
                     drafts = emptyList()
                     tiposDisponibles = emptyMap()
+                    ctxGuardar = ""
                 } else {
                     tiposDisponibles = data.tiposDisponibles
                     drafts = data.rows.mapIndexed { i, row -> row.toDraft(i) }
+                    ctxGuardar = data.ctxGuardar
                     resultsLoaded = true
                     showFilters = false
                     if (data.rows.isEmpty()) {
@@ -106,13 +115,13 @@ fun AusenciasScreen(
             statusMsg = null
             try {
                 val result = withContext(Dispatchers.IO) {
-                    updateSacdAusencias(client, baseUrl, idNom, drafts)
+                    updateSacdAusencias(client, baseUrl, idNom, ctxGuardar, drafts)
                 }
                 if (result.ok) {
-                    statusMsg = "Ausencias guardadas."
-                    reloadAusencias()
+                    statusMsg = "Ausencias guardadas correctamente."
+                    reloadAusencias(keepStatusMsg = true)
                 } else {
-                    error = result.message
+                    error = result.message.ifBlank { "Error al guardar las ausencias." }
                 }
             } finally {
                 saving = false
@@ -206,7 +215,7 @@ fun AusenciasScreen(
             style = MaterialTheme.typography.titleMedium,
         )
         Text(
-            text = "Edita fechas y guarda. Deja inicio y fin en blanco para borrar una fila.",
+            text = "Edita fechas y guarda. Deja inicio y fin en blank para borrar una fila.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -278,6 +287,77 @@ fun AusenciasScreen(
 
         if (loadingRows) MisasLoadingBox()
 
+        val ausenciasListHeaderCount =
+            if (resultsLoaded && !showFilters) {
+                1 + if (tiposDisponibles.isNotEmpty()) 1 else 0
+            } else {
+                0
+            }
+
+        LaunchedEffect(scrollToNewAusencia, drafts.size, ausenciasListHeaderCount) {
+            if (!scrollToNewAusencia || drafts.isEmpty()) return@LaunchedEffect
+            listState.animateScrollToItem(ausenciasListHeaderCount)
+            scrollToNewAusencia = false
+        }
+
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (resultsLoaded && !showFilters) {
+                item(key = "ausencias-historial") {
+                    TextButton(
+                        onClick = {
+                            historial = !historial
+                            reloadAusencias()
+                        },
+                        enabled = selectedSacdKey != null && !loadingRows && !saving,
+                    ) {
+                        Text(if (historial) "Solo vigentes" else "Ver anteriores")
+                    }
+                }
+                if (tiposDisponibles.isNotEmpty()) {
+                    item(key = "ausencias-add-tipo") {
+                        MisasDropdown(
+                            label = "Añadir ausencia / tarea",
+                            value = "",
+                            expanded = addTipoExpanded,
+                            onExpandedChange = { addTipoExpanded = it },
+                            options = tiposDisponibles.map { (id, label) -> id to label },
+                            onSelect = { idEnc ->
+                                val desc = tiposDisponibles[idEnc].orEmpty()
+                                val newDraft = SacdAusenciaDraft(
+                                    localKey = "new-${System.currentTimeMillis()}-$idEnc",
+                                    idEnc = idEnc.toIntOrNull() ?: 0,
+                                    descEnc = desc,
+                                    idItem = 0,
+                                    inicio = "",
+                                    fin = "",
+                                )
+                                drafts = listOf(newDraft) + drafts
+                                error = null
+                                statusMsg = null
+                                scrollToNewAusencia = true
+                            },
+                        )
+                    }
+                }
+            }
+            items(drafts, key = { it.localKey }) { draft ->
+                AusenciaEditCard(
+                    draft = draft,
+                    enabled = !saving && !loadingRows,
+                    onChange = { updated ->
+                        drafts = drafts.map { if (it.localKey == updated.localKey) updated else it }
+                        statusMsg = null
+                    },
+                )
+            }
+        }
+
         error?.let {
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
@@ -286,59 +366,12 @@ fun AusenciasScreen(
         }
 
         if (resultsLoaded && !showFilters) {
-            TextButton(
-                onClick = {
-                    historial = !historial
-                    reloadAusencias()
-                },
-                enabled = selectedSacdKey != null && !loadingRows && !saving,
-            ) {
-                Text(if (historial) "Solo vigentes" else "Ver anteriores")
-            }
-
-            if (tiposDisponibles.isNotEmpty()) {
-                MisasDropdown(
-                    label = "Añadir ausencia / tarea",
-                    value = "",
-                    expanded = addTipoExpanded,
-                    onExpandedChange = { addTipoExpanded = it },
-                    options = tiposDisponibles.map { (id, label) -> id to label },
-                    onSelect = { idEnc ->
-                        val desc = tiposDisponibles[idEnc].orEmpty()
-                        drafts = drafts + SacdAusenciaDraft(
-                            localKey = "new-${System.currentTimeMillis()}-$idEnc",
-                            idEnc = idEnc.toIntOrNull() ?: 0,
-                            descEnc = desc,
-                            idItem = 0,
-                            inicio = "",
-                            fin = "",
-                        )
-                        error = null
-                    },
-                )
-            }
-
             Button(
                 onClick = { saveAusencias() },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !saving && !loadingRows && drafts.isNotEmpty(),
             ) {
-                Text(if (saving) "Guardando…" else "Guardar")
-            }
-        }
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            items(drafts, key = { it.localKey }) { draft ->
-                AusenciaEditCard(
-                    draft = draft,
-                    enabled = !saving && !loadingRows,
-                    onChange = { updated ->
-                        drafts = drafts.map { if (it.localKey == updated.localKey) updated else it }
-                    },
-                )
+                Text(if (saving) "Guardando…" else "Guardar ausencias")
             }
         }
     }
@@ -370,36 +403,48 @@ private fun AusenciaEditCard(
                     color = MaterialTheme.colorScheme.tertiary,
                 )
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                LocalDateField(
-                    label = "Inicio",
-                    value = draft.inicio,
-                    onValueChange = { onChange(draft.copy(inicio = it)) },
-                    modifier = Modifier.weight(1f),
-                    enabled = enabled,
-                )
-                LocalDateField(
-                    label = "Fin",
-                    value = draft.fin,
-                    onValueChange = { onChange(draft.copy(fin = it)) },
-                    modifier = Modifier.weight(1f),
-                    enabled = enabled,
-                )
-            }
-            val horario = buildString {
-                if (draft.dedicM.isNotEmpty()) append("M: ${draft.dedicM} ")
-                if (draft.dedicT.isNotEmpty()) append("T: ${draft.dedicT} ")
-                if (draft.dedicV.isNotEmpty()) append("V: ${draft.dedicV}")
-            }.trim()
-            if (horario.isNotEmpty()) {
-                Text(
-                    horario,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                if (this.maxWidth < 360.dp) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        LocalDateField(
+                            label = "Inicio",
+                            value = draft.inicio,
+                            onValueChange = { onChange(draft.copy(inicio = it)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = enabled,
+                        )
+                        LocalDateField(
+                            label = "Fin",
+                            value = draft.fin,
+                            onValueChange = { onChange(draft.copy(fin = it)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = enabled,
+                        )
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        LocalDateField(
+                            label = "Inicio",
+                            value = draft.inicio,
+                            onValueChange = { onChange(draft.copy(inicio = it)) },
+                            modifier = Modifier.weight(1f),
+                            enabled = enabled,
+                        )
+                        LocalDateField(
+                            label = "Fin",
+                            value = draft.fin,
+                            onValueChange = { onChange(draft.copy(fin = it)) },
+                            modifier = Modifier.weight(1f),
+                            enabled = enabled,
+                        )
+                    }
+                }
             }
         }
     }
