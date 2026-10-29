@@ -57,6 +57,7 @@ fun NuevoPlanScreen(
     var periodoExpanded by remember { mutableStateOf(false) }
     var yearExpanded by remember { mutableStateOf(false) }
     var showFilters by remember { mutableStateOf(true) }
+    var showInfo by remember { mutableStateOf(false) }
     var resultsLoaded by remember { mutableStateOf(false) }
 
     val yearOptions = remember { yearActivOptions() }
@@ -155,15 +156,11 @@ fun NuevoPlanScreen(
             .fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            text = if (propuestaCalendario) "Nuevo plan" else "Planning por casas",
-            style = MaterialTheme.typography.titleMedium,
-        )
-        if (propuestaCalendario) {
-            Text(
+        if (showInfo) {
+            MisasInfoDialog(
+                title = "Nuevo plan",
                 text = "Vista de consulta. Crear o modificar actividades solo en la web.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                onDismiss = { showInfo = false },
             )
         }
 
@@ -201,11 +198,12 @@ fun NuevoPlanScreen(
                     result = null
                     error = null
                 },
+                onShowLegend = if (propuestaCalendario) ({ showInfo = true }) else null,
             )
         }
 
         if (showFilters) {
-            MisasFilterPanel {
+            MisasFilterPanel(onInfo = if (propuestaCalendario) ({ showInfo = true }) else null) {
                 MisasDropdown(
                     label = "Grupo de casas",
                     value = cdcOptions[selectedCdcSel].orEmpty(),

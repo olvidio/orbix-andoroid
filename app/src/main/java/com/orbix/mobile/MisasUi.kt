@@ -340,18 +340,35 @@ fun LocalTimeField(
 /** Ancho máximo de los filtros desplegados: no hace falta ocupar toda la pantalla. */
 private val FilterPanelMaxWidth = 440.dp
 
-/** Contenedor de filtros desplegados: centrado y con ancho acotado. */
+/**
+ * Contenedor de filtros desplegados: centrado, con ancho acotado y con scroll propio
+ * (en horizontal los filtros no caben y el botón de buscar quedaba inalcanzable).
+ * Con [onInfo] muestra el botón ⓘ de la explicación de la pantalla.
+ */
 @Composable
-fun MisasFilterPanel(
+fun ColumnScope.MisasFilterPanel(
     modifier: Modifier = Modifier,
+    onInfo: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+    Box(
+        modifier = modifier
+            .weight(1f, fill = false)
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+        contentAlignment = Alignment.TopCenter,
+    ) {
         Column(
             modifier = Modifier.widthIn(max = FilterPanelMaxWidth).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
-            content = content,
-        )
+        ) {
+            if (onInfo != null) {
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                    MisasLegendButton(onInfo)
+                }
+            }
+            content()
+        }
     }
 }
 

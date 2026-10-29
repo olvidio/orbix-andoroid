@@ -528,11 +528,7 @@ fun PlanDeMisasCuadriculaScreen(
         }
 
         if (showFilters) {
-            MisasFilterPanel(
-                modifier = Modifier
-                    .weight(1f, fill = false)
-                    .verticalScroll(rememberScrollState()),
-            ) {
+            MisasFilterPanel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     MisasDropdown(
                         label = "Zona",

@@ -102,7 +102,6 @@ fun VerPlanSacdScreen(
         modifier = Modifier.padding(contentPadding).padding(horizontal = 12.dp, vertical = 8.dp).fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Plan de un sacerdote", style = MaterialTheme.typography.titleMedium)
         if (loadingPage) {
             MisasLoadingBox()
             return@Column
@@ -309,6 +308,7 @@ fun InicialesZonaScreen(
     var selectedZona by remember { mutableStateOf<String?>(null) }
     var zonaExpanded by remember { mutableStateOf(false) }
     var showFilters by remember { mutableStateOf(true) }
+    var showInfo by remember { mutableStateOf(false) }
 
     var editingRow by remember { mutableStateOf<Map<String, String>?>(null) }
     var editIniciales by remember { mutableStateOf("") }
@@ -412,12 +412,13 @@ fun InicialesZonaScreen(
             .fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Iniciales de sacerdotes", style = MaterialTheme.typography.titleMedium)
-        Text(
-            text = "Toca una fila para editar iniciales y color.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (showInfo) {
+            MisasInfoDialog(
+                title = "Iniciales de sacerdotes",
+                text = "Toca una fila para editar iniciales y color.",
+                onDismiss = { showInfo = false },
+            )
+        }
         if (loadingPage) {
             MisasLoadingBox()
             return@Column
@@ -436,10 +437,11 @@ fun InicialesZonaScreen(
                     error = null
                     statusMsg = null
                 },
+                onShowLegend = { showInfo = true },
             )
         }
         if (showFilters) {
-            MisasFilterPanel {
+            MisasFilterPanel(onInfo = { showInfo = true }) {
                 MisasDropdown(
                     label = "Zona",
                     value = zonas[selectedZona].orEmpty(),
