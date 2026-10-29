@@ -134,12 +134,6 @@ fun PlanningZonasScreen(
             .fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Planning zonas", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "Calendario día a día: sacds ocupados; pulsa uno para ver la actividad.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
 
         if (loadingPage) {
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -187,48 +181,50 @@ fun PlanningZonasScreen(
         }
 
         if (showFilters) {
-            PlanningDropdown(
-                label = "Trimestre o mes",
-                value = planningTrimestreLabels()[selectedTrimestre].orEmpty(),
-                expanded = trimestreExpanded,
-                onExpandedChange = { trimestreExpanded = it },
-                options = planningTrimestreLabels().map { (id, label) -> id to label },
-                onSelect = {
-                    selectedTrimestre = it
-                    trimestreExpanded = false
-                },
-            )
+            MisasFilterPanel {
+                PlanningDropdown(
+                    label = "Trimestre o mes",
+                    value = planningTrimestreLabels()[selectedTrimestre].orEmpty(),
+                    expanded = trimestreExpanded,
+                    onExpandedChange = { trimestreExpanded = it },
+                    options = planningTrimestreLabels().map { (id, label) -> id to label },
+                    onSelect = {
+                        selectedTrimestre = it
+                        trimestreExpanded = false
+                    },
+                )
 
-            PlanningDropdown(
-                label = "Año",
-                value = selectedYear,
-                expanded = yearExpanded,
-                onExpandedChange = { yearExpanded = it },
-                options = yearOptions,
-                onSelect = {
-                    selectedYear = it
-                    yearExpanded = false
-                },
-            )
+                PlanningDropdown(
+                    label = "Año",
+                    value = selectedYear,
+                    expanded = yearExpanded,
+                    onExpandedChange = { yearExpanded = it },
+                    options = yearOptions,
+                    onSelect = {
+                        selectedYear = it
+                        yearExpanded = false
+                    },
+                )
 
-            PlanningDropdown(
-                label = "Zona",
-                value = zonas[selectedZonaId].orEmpty(),
-                expanded = zonaExpanded,
-                onExpandedChange = { zonaExpanded = it },
-                options = zonas.map { (id, label) -> id to label },
-                onSelect = {
-                    selectedZonaId = it
-                    zonaExpanded = false
-                },
-            )
+                PlanningDropdown(
+                    label = "Zona",
+                    value = zonas[selectedZonaId].orEmpty(),
+                    expanded = zonaExpanded,
+                    onExpandedChange = { zonaExpanded = it },
+                    options = zonas.map { (id, label) -> id to label },
+                    onSelect = {
+                        selectedZonaId = it
+                        zonaExpanded = false
+                    },
+                )
 
-            Button(
-                onClick = { buscar() },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !loadingResult && selectedZonaId != null,
-            ) {
-                Text("Ver planning")
+                Button(
+                    onClick = { buscar() },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !loadingResult && selectedZonaId != null,
+                ) {
+                    Text("Ver planning")
+                }
             }
         }
 

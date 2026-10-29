@@ -145,8 +145,8 @@ private fun diagnoseGrupMenuEmptyResponse(body: String): String {
     return try {
         val root = JSONObject(body)
         if (!root.optBoolean("success", false)) {
-            val m = root.optString("mensaje", "")
-            val dataStr = root.optString("data", "")
+            val m = root.optStr("mensaje", "")
+            val dataStr = root.optStr("data", "")
             val authHint = if (dataStr.contains("auth_required")) {
                 " [code auth_required: el servidor no ve tu sesión en este GET; suele ser cookie PHPSESSID. Cierra sesión en la app y vuelve a entrar.]"
             } else {
@@ -225,7 +225,7 @@ internal fun parseGrupMenuColeccionBody(body: String): List<GrupMenuItem> {
                         } else {
                             idRaw.toString()
                         }
-                        val label = row.optString("grupmenu", "")
+                        val label = row.optStr("grupmenu", "")
                         if (label.isNotEmpty()) {
                             val order = when (val o = row.opt("orden")) {
                                 is Number -> o.toInt()
@@ -285,7 +285,7 @@ private fun parseGrupMenuEntries(menus: JSONArray?): List<OrbixMenuItem> {
     val out = mutableListOf<OrbixMenuItem>()
     for (i in 0 until menus.length()) {
         val row = menus.optJSONObject(i) ?: continue
-        val label = row.optString("menu", "")
+        val label = row.optStr("menu", "")
         if (label.isEmpty()) continue
         val id = row.opt("id_menu")?.toString()?.takeIf { it.isNotEmpty() && it != "null" }
             ?: "${i}_${label.hashCode()}"
@@ -293,7 +293,7 @@ private fun parseGrupMenuEntries(menus: JSONArray?): List<OrbixMenuItem> {
             OrbixMenuItem(
                 id = id,
                 label = label,
-                url = row.optString("url", ""),
+                url = row.optStr("url", ""),
                 order = parseMenuOrder(row.optJSONArray("orden")),
             ),
         )
@@ -332,7 +332,7 @@ internal fun parseSrcEnvelope(body: String): SrcEnvelope? {
     return try {
         val root = JSONObject(body)
         val success = root.optBoolean("success", false)
-        val mensaje = root.optString("mensaje", "")
+        val mensaje = root.optStr("mensaje", "")
         when (val raw = root.opt("data")) {
             is JSONObject -> SrcEnvelope(success, mensaje, raw, "")
             is String -> {
@@ -387,8 +387,19 @@ internal fun postSrcFormFields(
     val req = Request.Builder().url(url).headerAcceptSrcJson().post(body).build()
     return client.newCall(req).execute().use { response ->
         // ContestarJson puede devolver 4xx con cuerpo JSON de error.
-        response.body?.string()
+        val text = response.body?.string().orEmpty()
+        if (text.trimStart().startsWith("{")) text else nonJsonErrorEnvelope(response.code, text)
     }
+}
+
+/** Cuerpo no JSON (fatal PHP, HTML de error, vacío…): lo convierte en envelope de error legible. */
+private fun nonJsonErrorEnvelope(httpCode: Int, text: String): String {
+    val snippet = text.replace(Regex("<[^>]*>"), " ").replace(Regex("\\s+"), " ").trim().take(200)
+    val msg = buildString {
+        append("Respuesta no válida del servidor (HTTP ").append(httpCode).append(')')
+        if (snippet.isNotEmpty()) append(": ").append(snippet)
+    }
+    return JSONObject().put("success", false).put("mensaje", msg).put("data", "").toString()
 }
 
 fun fetchSessionAuthenticated(client: OkHttpClient, baseUrl: String): Boolean {

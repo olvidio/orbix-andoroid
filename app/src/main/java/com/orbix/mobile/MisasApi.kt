@@ -52,6 +52,8 @@ data class CambiarStatusPantalla(
     val zonasOpciones: Map<String, String>,
     val ordenOpciones: Map<String, String>,
     val estadosOpciones: Map<String, String>,
+    /** `ctx_nuevo_status` firmado (HashB) por id de zona. */
+    val zonaCtxMap: Map<String, String> = emptyMap(),
 )
 
 data class BuscarPlanSacdPage(
@@ -163,9 +165,9 @@ fun fetchPlanDeMisasPantalla(
         zonasOpciones = jsonObjectToStringMap(data.optJSONObject("zonas_opciones")),
         ordenOpciones = jsonObjectToStringMap(data.optJSONObject("orden_opciones")),
         tiposPlantilla = jsonObjectToStringMap(data.optJSONObject("tipos_plantilla")),
-        plantillaSelected = data.optString("plantilla_selected").takeIf { it.isNotEmpty() },
-        ctxCrear = data.optString("ctx_crear", ""),
-        ctxImportar = data.optString("ctx_importar", ""),
+        plantillaSelected = data.optStr("plantilla_selected").takeIf { it.isNotEmpty() },
+        ctxCrear = data.optStr("ctx_crear", ""),
+        ctxImportar = data.optStr("ctx_importar", ""),
     )
 }
 
@@ -179,6 +181,7 @@ fun fetchCambiarStatusPantalla(
         zonasOpciones = jsonObjectToStringMap(data.optJSONObject("zonas_opciones")),
         ordenOpciones = jsonObjectToStringMap(data.optJSONObject("orden_opciones")),
         estadosOpciones = jsonObjectToIntKeyStringMap(data.optJSONObject("estados_opciones")),
+        zonaCtxMap = jsonObjectToStringMap(data.optJSONObject("zona_ctx_map")),
     )
 }
 
@@ -209,7 +212,7 @@ fun fetchCuadriculaZona(
         ),
     ) ?: return null
     val data = parseContestarDataObject(body) ?: return null
-    val apiError = data.optString("error")
+    val apiError = data.optStr("error")
     if (apiError.isNotEmpty()) {
         return CuadriculaZona(emptyList(), emptyList(), preferenceWarning = apiError)
     }
@@ -234,7 +237,7 @@ fun fetchBuscarPlanSacdPage(client: OkHttpClient, baseUrl: String): BuscarPlanSa
     val data = parseContestarDataObject(body) ?: return null
     return BuscarPlanSacdPage(
         sacdOpciones = jsonObjectToStringMap(data.optJSONObject("sacd_opciones")),
-        sacdSelected = data.optString("sacd_selected", ""),
+        sacdSelected = data.optStr("sacd_selected", ""),
     )
 }
 
@@ -264,9 +267,9 @@ fun fetchVerPlanSacd(
         val row = arr.optJSONObject(i) ?: continue
         out.add(
             PlanSacdRow(
-                dia = row.optString("dia", ""),
-                encargo = row.optString("encargo", ""),
-                observ = row.optString("observ", ""),
+                dia = row.optStr("dia", ""),
+                encargo = row.optStr("encargo", ""),
+                observ = row.optStr("observ", ""),
             ),
         )
     }
@@ -285,13 +288,13 @@ fun fetchBuscarPlanCtrPage(
         mapOf("id_zona" to idZona),
     ) ?: return null
     val data = parseContestarDataObject(body) ?: return null
-    val view = data.optString("view", "none")
+    val view = data.optStr("view", "none")
     return BuscarPlanCtrPage(
         view = view,
         zonasOpciones = jsonObjectToStringMap(data.optJSONObject("zonas_opciones")),
-        zonasSelected = data.opt("zonas_selected")?.toString().orEmpty(),
+        zonasSelected = data.opt("zonas_selected").jsonText(),
         centrosOpciones = jsonObjectToStringMap(data.optJSONObject("centros_opciones")),
-        centrosSelected = data.optString("centros_selected", ""),
+        centrosSelected = data.optStr("centros_selected", ""),
         error = if (view == "none") "No tiene permiso para ver esta pantalla." else null,
     )
 }
@@ -322,10 +325,10 @@ fun fetchVerPlanCtr(
             val c = arr.optJSONObject(i) ?: continue
             columns.add(
                 PlanCtrColumn(
-                    letra = c.optString("letra", ""),
-                    numDia = c.optString("num_dia", ""),
-                    numMes = c.optString("num_mes", ""),
-                    idDia = c.optString("id_dia", ""),
+                    letra = c.optStr("letra", ""),
+                    numDia = c.optStr("num_dia", ""),
+                    numMes = c.optStr("num_mes", ""),
+                    idDia = c.optStr("id_dia", ""),
                 ),
             )
         }
@@ -338,10 +341,10 @@ fun fetchVerPlanCtr(
             val cells = mutableListOf<String>()
             if (cellsArr != null) {
                 for (j in 0 until cellsArr.length()) {
-                    cells.add(cellsArr.opt(j)?.toString().orEmpty())
+                    cells.add(cellsArr.opt(j).jsonText())
                 }
             }
-            rows.add(PlanCtrRow(descEnc = r.optString("desc_enc", ""), cells = cells))
+            rows.add(PlanCtrRow(descEnc = r.optStr("desc_enc", ""), cells = cells))
         }
     }
     val legend = mutableListOf<PlanCtrLegendItem>()
@@ -350,8 +353,8 @@ fun fetchVerPlanCtr(
             val l = arr.optJSONObject(i) ?: continue
             legend.add(
                 PlanCtrLegendItem(
-                    iniciales = l.optString("iniciales", ""),
-                    nombre = l.optString("nombre", ""),
+                    iniciales = l.optStr("iniciales", ""),
+                    nombre = l.optStr("nombre", ""),
                 ),
             )
         }
@@ -362,7 +365,7 @@ fun fetchVerPlanCtr(
 fun fetchModificarEncargosPage(client: OkHttpClient, baseUrl: String): ZonaOpcionesPage? {
     val body = postSrcForm(client, baseUrl, "/src/misas/modificar_encargos_data", emptyMap()) ?: return null
     val data = parseContestarDataObject(body) ?: return null
-    val error = data.optString("error").takeIf { it.isNotEmpty() }
+    val error = data.optStr("error").takeIf { it.isNotEmpty() }
     return ZonaOpcionesPage(
         zonasOpciones = jsonObjectToStringMap(data.optJSONObject("a_opciones_zona")),
         ordenOpciones = jsonObjectToStringMap(data.optJSONObject("a_orden")),
@@ -378,7 +381,7 @@ fun fetchModificarEncargosCentrosPage(client: OkHttpClient, baseUrl: String): Zo
         emptyMap(),
     ) ?: return null
     val data = parseContestarDataObject(body) ?: return null
-    val error = data.optString("error").takeIf { it.isNotEmpty() }
+    val error = data.optStr("error").takeIf { it.isNotEmpty() }
     return ZonaOpcionesPage(
         zonasOpciones = jsonObjectToStringMap(data.optJSONObject("a_opciones_zona")),
         error = error,
@@ -416,7 +419,7 @@ fun fetchVerEncargosZona(
         tiposEncargo = jsonObjectToStringMap(data.optJSONObject("tipos_encargo")),
         centros = jsonObjectToStringMap(data.optJSONObject("centros")),
         idiomas = jsonObjectToStringMap(data.optJSONObject("idiomas")),
-        ctxNuevo = data.optString("ctx_nuevo", ""),
+        ctxNuevo = data.optStr("ctx_nuevo", ""),
     )
 }
 
@@ -435,7 +438,7 @@ fun fetchVerEncargosCentros(
     return EncargosCentrosGrid(
         rows = parseJsonRows(data.optJSONArray("rows")),
         centrosZona = jsonObjectToStringMap(data.optJSONObject("a_centros_zona")),
-        ctxNuevo = data.optString("ctx_nuevo", ""),
+        ctxNuevo = data.optStr("ctx_nuevo", ""),
     )
 }
 
@@ -454,7 +457,7 @@ fun fetchDesplegableEncargos(
     val data = parseContestarDataObject(body) ?: return null
     return DesplegableOpciones(
         opciones = parseOpcionesPairs(data.opt("opciones")),
-        selected = data.opt("selected")?.toString().orEmpty(),
+        selected = data.opt("selected").jsonText(),
     )
 }
 
@@ -557,7 +560,7 @@ private fun parseOpcionesPairs(raw: Any?): Map<String, String> {
             for (i in 0 until raw.length()) {
                 val pair = raw.optJSONArray(i) ?: continue
                 if (pair.length() >= 2) {
-                    out[pair.opt(0)?.toString().orEmpty()] = pair.opt(1)?.toString().orEmpty()
+                    out[pair.opt(0).jsonText()] = pair.opt(1).jsonText()
                 }
             }
             out
@@ -586,6 +589,7 @@ fun postNuevoStatus(
     client: OkHttpClient,
     baseUrl: String,
     idZona: String,
+    ctxNuevoStatus: String,
     periodo: String,
     estado: String,
     empiezaMin: String = "",
@@ -597,6 +601,7 @@ fun postNuevoStatus(
         "/src/misas/nuevo_status",
         mapOf(
             "id_zona" to idZona,
+            "ctx_nuevo_status" to ctxNuevoStatus,
             "periodo" to periodo,
             "estado" to estado,
             "empiezamin" to empiezaMin,
@@ -665,7 +670,7 @@ fun fetchDesplegableSacd(
     val opciones = fromPairs.ifEmpty { fromRows }
     return DesplegableOpciones(
         opciones = opciones,
-        selected = data.opt("selected")?.toString().orEmpty(),
+        selected = data.opt("selected").jsonText(),
     )
 }
 
@@ -796,7 +801,7 @@ private fun parseValueLabelRows(arr: JSONArray?): Map<String, String> {
     val out = linkedMapOf<String, String>()
     for (i in 0 until arr.length()) {
         val obj = arr.optJSONObject(i) ?: continue
-        out[obj.opt("value")?.toString().orEmpty()] = obj.optString("label", "")
+        out[obj.opt("value").jsonText()] = obj.optStr("label", "")
     }
     return out
 }
@@ -810,7 +815,7 @@ private fun parseJsonRows(arr: JSONArray?): List<Map<String, String>> {
         val keys = obj.keys()
         while (keys.hasNext()) {
             val k = keys.next()
-            map[k] = obj.opt(k)?.toString().orEmpty()
+            map[k] = obj.opt(k).jsonText()
         }
         out.add(map)
     }
@@ -823,7 +828,7 @@ private fun jsonObjectToStringMap(obj: JSONObject?): Map<String, String> {
     val keys = obj.keys()
     while (keys.hasNext()) {
         val k = keys.next()
-        out[k] = obj.optString(k, k)
+        out[k] = obj.optStr(k, k)
     }
     return out
 }
@@ -834,7 +839,7 @@ private fun jsonObjectToIntKeyStringMap(obj: JSONObject?): Map<String, String> {
     val keys = obj.keys()
     while (keys.hasNext()) {
         val k = keys.next()
-        out[k] = obj.optString(k, k)
+        out[k] = obj.optStr(k, k)
     }
     return out
 }
@@ -846,8 +851,8 @@ private fun parseColumnsCuadricula(raw: String): Map<String, String> {
         val out = linkedMapOf<String, String>()
         for (i in 0 until arr.length()) {
             val col = arr.optJSONObject(i) ?: continue
-            val field = col.optString("field", "")
-            val name = col.optString("name", field)
+            val field = col.optStr("field", "")
+            val name = col.optStr("name", field)
             if (field.matches(DATE_COLUMN_REGEX)) {
                 out[field] = name
             }
@@ -858,14 +863,14 @@ private fun parseColumnsCuadricula(raw: String): Map<String, String> {
 
 private fun parseCuadriculaZona(data: JSONObject): CuadriculaZona {
     val rawRows = data.optJSONArray("data_cuadricula") ?: JSONArray()
-    val columnHeaders = parseColumnsCuadricula(data.optString("columns_cuadricula", ""))
+    val columnHeaders = parseColumnsCuadricula(data.optStr("columns_cuadricula", ""))
     val parsedRows = mutableListOf<CuadriculaRow>()
     val dateColumns = linkedSetOf<String>()
 
     for (i in 0 until rawRows.length()) {
         val row = rawRows.optJSONObject(i) ?: continue
-        val encargo = row.optString("encargo", "")
-        val colorEncargo = row.optString("color_encargo", "")
+        val encargo = row.optStr("encargo", "")
+        val colorEncargo = row.optStr("color_encargo", "")
         val isTitle = colorEncargo == "titulo"
         val cells = linkedMapOf<String, String>()
         val metaByDate = linkedMapOf<String, CuadriculaCellMeta>()
@@ -880,17 +885,17 @@ private fun parseCuadriculaZona(data: JSONObject): CuadriculaZona {
                 val date = metaKeys.next()
                 val cellMeta = metaObj.optJSONObject(date) ?: continue
                 metaByDate[date] = CuadriculaCellMeta(
-                    uuidItem = cellMeta.optString("uuid_item", ""),
-                    key = cellMeta.optString("key", ""),
-                    idEnc = cellMeta.opt("id_enc")?.toString().orEmpty(),
-                    dia = cellMeta.optString("dia", date),
-                    tstart = cellMeta.optString("tstart", ""),
-                    tend = cellMeta.optString("tend", ""),
-                    observ = cellMeta.optString("observ", ""),
-                    status = cellMeta.opt("status")?.toString().orEmpty(),
-                    tipo = cellMeta.optString("tipo", ""),
-                    color = cellMeta.optString("color", ""),
-                    texto = cellMeta.optString("texto", ""),
+                    uuidItem = cellMeta.optStr("uuid_item", ""),
+                    key = cellMeta.optStr("key", ""),
+                    idEnc = cellMeta.opt("id_enc").jsonText(),
+                    dia = cellMeta.optStr("dia", date),
+                    tstart = cellMeta.optStr("tstart", ""),
+                    tend = cellMeta.optStr("tend", ""),
+                    observ = cellMeta.optStr("observ", ""),
+                    status = cellMeta.opt("status").jsonText(),
+                    tipo = cellMeta.optStr("tipo", ""),
+                    color = cellMeta.optStr("color", ""),
+                    texto = cellMeta.optStr("texto", ""),
                 )
                 if (date.matches(DATE_COLUMN_REGEX)) {
                     dateColumns.add(date)
@@ -901,7 +906,7 @@ private fun parseCuadriculaZona(data: JSONObject): CuadriculaZona {
         while (keys.hasNext()) {
             val key = keys.next()
             if (key in IGNORED_ROW_KEYS) continue
-            val value = row.opt(key)?.toString().orEmpty()
+            val value = row.opt(key).jsonText()
             cells[key] = value
             if (key.matches(DATE_COLUMN_REGEX)) {
                 dateColumns.add(key)
@@ -922,13 +927,20 @@ private fun parseCuadriculaZona(data: JSONObject): CuadriculaZona {
         dateColumns = dateColumns.sorted(),
         rows = parsedRows,
         columnHeaders = columnHeaders,
-        ctxUpdate = data.optString("ctx_update", ""),
+        ctxUpdate = data.optStr("ctx_update", ""),
         estadosOpciones = parseOpcionesPairs(data.opt("estados_opciones")),
-        statusPropuesta = data.opt("status_propuesta")?.toString()?.takeIf { it.isNotEmpty() }
+        statusPropuesta = data.opt("status_propuesta").jsonText().takeIf { it.isNotEmpty() }
             ?: "1",
-        preferenceWarning = data.optString("preference_warning").takeIf { it.isNotEmpty() },
+        preferenceWarning = data.optStr("preference_warning").takeIf { it.isNotEmpty() },
     )
 }
 
 private val IGNORED_ROW_KEYS = setOf("encargo", "id_nom", "color_encargo", "meta")
 private val DATE_COLUMN_REGEX = Regex("^\\d{4}-\\d{2}-\\d{2}$")
+
+/** Como `optString`, pero un `null` JSON devuelve el valor por defecto en vez de `"null"`. */
+fun JSONObject.optStr(name: String, fallback: String = ""): String =
+    if (isNull(name)) fallback else optString(name, fallback)
+
+/** Texto de un valor JSON; ausente o `null` JSON → vacío (no `"null"`). */
+fun Any?.jsonText(): String = if (this == null || this === JSONObject.NULL) "" else toString()

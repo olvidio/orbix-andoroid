@@ -120,24 +120,26 @@ fun VerPlanSacdScreen(
             )
         }
         if (showFilters) {
-            MisasDropdown(
-                label = "Sacerdote",
-                value = sacds[selectedSacd].orEmpty(),
-                expanded = sacdExpanded,
-                onExpandedChange = { sacdExpanded = it },
-                options = sacds.map { (id, label) -> id to label },
-                onSelect = { selectedSacd = it },
-            )
-            MisasDropdown(
-                label = "Periodo",
-                value = periodoOptions[selectedPeriodo].orEmpty(),
-                expanded = periodoExpanded,
-                onExpandedChange = { periodoExpanded = it },
-                options = periodoOptions.map { (id, label) -> id to label },
-                onSelect = { selectedPeriodo = it },
-            )
-            Button(onClick = { buscar() }, modifier = Modifier.fillMaxWidth(), enabled = !loadingResult) {
-                Text("Ver plan")
+            MisasFilterPanel {
+                MisasDropdown(
+                    label = "Sacerdote",
+                    value = sacds[selectedSacd].orEmpty(),
+                    expanded = sacdExpanded,
+                    onExpandedChange = { sacdExpanded = it },
+                    options = sacds.map { (id, label) -> id to label },
+                    onSelect = { selectedSacd = it },
+                )
+                MisasDropdown(
+                    label = "Periodo",
+                    value = periodoOptions[selectedPeriodo].orEmpty(),
+                    expanded = periodoExpanded,
+                    onExpandedChange = { periodoExpanded = it },
+                    options = periodoOptions.map { (id, label) -> id to label },
+                    onSelect = { selectedPeriodo = it },
+                )
+                Button(onClick = { buscar() }, modifier = Modifier.fillMaxWidth(), enabled = !loadingResult) {
+                    Text("Ver plan")
+                }
             }
         }
         if (loadingResult) MisasLoadingBox()
@@ -229,7 +231,6 @@ fun VerPlanCtrScreen(
         modifier = Modifier.padding(contentPadding).padding(horizontal = 12.dp, vertical = 8.dp).fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Plan de un centro", style = MaterialTheme.typography.titleMedium)
         if (loading) MisasLoadingBox()
 
         val p = page
@@ -245,41 +246,43 @@ fun VerPlanCtrScreen(
                 )
             }
             if (showFilters) {
-                if (p.zonasOpciones.isNotEmpty()) {
+                MisasFilterPanel {
+                    if (p.zonasOpciones.isNotEmpty()) {
+                        MisasDropdown(
+                            label = "Zona",
+                            value = p.zonasOpciones[selectedZona].orEmpty(),
+                            expanded = zonaExpanded,
+                            onExpandedChange = { zonaExpanded = it },
+                            options = p.zonasOpciones.map { (id, label) -> id to label },
+                            onSelect = {
+                                selectedZona = it
+                                loadPage(it)
+                            },
+                        )
+                    }
                     MisasDropdown(
-                        label = "Zona",
-                        value = p.zonasOpciones[selectedZona].orEmpty(),
-                        expanded = zonaExpanded,
-                        onExpandedChange = { zonaExpanded = it },
-                        options = p.zonasOpciones.map { (id, label) -> id to label },
-                        onSelect = {
-                            selectedZona = it
-                            loadPage(it)
-                        },
+                        label = "Centro",
+                        value = p.centrosOpciones[selectedCentro].orEmpty(),
+                        expanded = centroExpanded,
+                        onExpandedChange = { centroExpanded = it },
+                        options = p.centrosOpciones.map { (id, label) -> id to label },
+                        onSelect = { selectedCentro = it },
                     )
-                }
-                MisasDropdown(
-                    label = "Centro",
-                    value = p.centrosOpciones[selectedCentro].orEmpty(),
-                    expanded = centroExpanded,
-                    onExpandedChange = { centroExpanded = it },
-                    options = p.centrosOpciones.map { (id, label) -> id to label },
-                    onSelect = { selectedCentro = it },
-                )
-                MisasDropdown(
-                    label = "Periodo",
-                    value = periodoOptions[selectedPeriodo].orEmpty(),
-                    expanded = periodoExpanded,
-                    onExpandedChange = { periodoExpanded = it },
-                    options = periodoOptions.map { (id, label) -> id to label },
-                    onSelect = { selectedPeriodo = it },
-                )
-                Button(
-                    onClick = { buscar() },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !loadingGrid && selectedCentro != null,
-                ) {
-                    Text("Ver plan")
+                    MisasDropdown(
+                        label = "Periodo",
+                        value = periodoOptions[selectedPeriodo].orEmpty(),
+                        expanded = periodoExpanded,
+                        onExpandedChange = { periodoExpanded = it },
+                        options = periodoOptions.map { (id, label) -> id to label },
+                        onSelect = { selectedPeriodo = it },
+                    )
+                    Button(
+                        onClick = { buscar() },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !loadingGrid && selectedCentro != null,
+                    ) {
+                        Text("Ver plan")
+                    }
                 }
             }
         }
@@ -436,20 +439,22 @@ fun InicialesZonaScreen(
             )
         }
         if (showFilters) {
-            MisasDropdown(
-                label = "Zona",
-                value = zonas[selectedZona].orEmpty(),
-                expanded = zonaExpanded,
-                onExpandedChange = { zonaExpanded = it },
-                options = zonas.map { (id, label) -> id to label },
-                onSelect = { selectedZona = it },
-            )
-            Button(
-                onClick = { buscar() },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !loadingGrid,
-            ) {
-                Text("Ver listado")
+            MisasFilterPanel {
+                MisasDropdown(
+                    label = "Zona",
+                    value = zonas[selectedZona].orEmpty(),
+                    expanded = zonaExpanded,
+                    onExpandedChange = { zonaExpanded = it },
+                    options = zonas.map { (id, label) -> id to label },
+                    onSelect = { selectedZona = it },
+                )
+                Button(
+                    onClick = { buscar() },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !loadingGrid,
+                ) {
+                    Text("Ver listado")
+                }
             }
         }
         if (loadingGrid) MisasLoadingBox()

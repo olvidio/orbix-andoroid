@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -58,6 +59,7 @@ fun AusenciasScreen(
     var sacdExpanded by remember { mutableStateOf(false) }
     var addTipoExpanded by remember { mutableStateOf(false) }
     var showFilters by remember { mutableStateOf(true) }
+    var showInfoDialog by remember { mutableStateOf(false) }
     var resultsLoaded by remember { mutableStateOf(false) }
     var scrollToNewAusencia by remember { mutableStateOf(false) }
 
@@ -210,15 +212,7 @@ fun AusenciasScreen(
             .fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            text = if (mode == AusenciasMode.JefeZona) "Ausencias" else "Ausencias SACD",
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Text(
-            text = "Edita fechas y guarda. Deja inicio y fin en blank para borrar una fila.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        val showInfo = { showInfoDialog = true }
 
         if (loadingPage) {
             MisasLoadingBox()
@@ -251,38 +245,57 @@ fun AusenciasScreen(
                     error = null
                     statusMsg = null
                 },
+                onShowLegend = showInfo,
             )
         }
 
         if (showFilters) {
-            if (mode == AusenciasMode.SacdLista) {
-                MisasDropdown(
-                    label = "Tipo SACD",
-                    value = filtroLabels[selectedFiltro].orEmpty(),
-                    expanded = filtroExpanded,
-                    onExpandedChange = { filtroExpanded = it },
-                    options = filtroLabels.map { (id, label) -> id to label },
-                    onSelect = {
-                        selectedFiltro = it
-                        reloadSacdList()
-                    },
-                )
+            MisasFilterPanel {
+                if (mode == AusenciasMode.SacdLista) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        MisasDropdown(
+                            label = "Tipo SACD",
+                            value = filtroLabels[selectedFiltro].orEmpty(),
+                            expanded = filtroExpanded,
+                            onExpandedChange = { filtroExpanded = it },
+                            options = filtroLabels.map { (id, label) -> id to label },
+                            onSelect = {
+                                selectedFiltro = it
+                                reloadSacdList()
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                        MisasLegendButton(showInfo)
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    MisasDropdown(
+                        label = "Sacerdote",
+                        value = sacdOptions[selectedSacdKey].orEmpty(),
+                        expanded = sacdExpanded,
+                        onExpandedChange = { sacdExpanded = it },
+                        options = sacdOptions.map { (id, label) -> id to label },
+                        onSelect = { selectedSacdKey = it },
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (mode != AusenciasMode.SacdLista) MisasLegendButton(showInfo)
+                }
+                Button(
+                    onClick = { reloadAusencias() },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !loadingRows && selectedSacdKey != null,
+                ) {
+                    Text("Ver ausencias")
+                }
             }
-            MisasDropdown(
-                label = "Sacerdote",
-                value = sacdOptions[selectedSacdKey].orEmpty(),
-                expanded = sacdExpanded,
-                onExpandedChange = { sacdExpanded = it },
-                options = sacdOptions.map { (id, label) -> id to label },
-                onSelect = { selectedSacdKey = it },
+        }
+
+        if (showInfoDialog) {
+            MisasInfoDialog(
+                title = "Ausencias",
+                text = "Edita fechas y guarda. Deja inicio y fin en blanco para borrar una fila.",
+                onDismiss = { showInfoDialog = false },
             )
-            Button(
-                onClick = { reloadAusencias() },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !loadingRows && selectedSacdKey != null,
-            ) {
-                Text("Ver ausencias")
-            }
         }
 
         if (loadingRows) MisasLoadingBox()

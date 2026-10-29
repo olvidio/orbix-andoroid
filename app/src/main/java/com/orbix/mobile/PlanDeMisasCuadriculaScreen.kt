@@ -1,6 +1,7 @@
 package com.orbix.mobile
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -165,6 +166,7 @@ fun PlanDeMisasCuadriculaScreen(
     var importOrigenExpanded by remember { mutableStateOf(false) }
     var showFilters by remember { mutableStateOf(true) }
     var showImportDialog by remember { mutableStateOf(false) }
+    var showLegend by remember { mutableStateOf(false) }
 
     var editingMeta by remember { mutableStateOf<CuadriculaCellMeta?>(null) }
     var editEncargoLabel by remember { mutableStateOf("") }
@@ -246,6 +248,7 @@ fun PlanDeMisasCuadriculaScreen(
                         client = client,
                         baseUrl = baseUrl,
                         idZona = zona,
+                        ctxNuevoStatus = statusPantalla?.zonaCtxMap?.get(zona).orEmpty(),
                         periodo = selectedPeriodo,
                         estado = estado,
                     )
@@ -485,8 +488,7 @@ fun PlanDeMisasCuadriculaScreen(
             .fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(config.title, style = MaterialTheme.typography.titleMedium)
-        config.readOnlyNote?.let { MisasReadOnlyNote(it) }
+        val summaryBarVisible = !showFilters && cuadricula != null
 
         if (loadingPage) {
             MisasLoadingBox()
@@ -517,92 +519,106 @@ fun PlanDeMisasCuadriculaScreen(
             }
         }
 
-        if (!showFilters && cuadricula != null) {
-            MisasFilterSummaryBar(summary = filterSummary, onShowFilters = { showFilters = true })
+        if (summaryBarVisible) {
+            MisasFilterSummaryBar(
+                summary = filterSummary,
+                onShowFilters = { showFilters = true },
+                onShowLegend = { showLegend = true },
+            )
         }
 
         if (showFilters) {
-            MisasDropdown(
-                label = "Zona",
-                value = zonas[selectedZonaId].orEmpty(),
-                expanded = zonaExpanded,
-                onExpandedChange = { zonaExpanded = it },
-                options = zonas.map { (id, label) -> id to label },
-                onSelect = { selectedZonaId = it },
-            )
-            if (config.showEstado) {
-                val estados = statusPantalla?.estadosOpciones.orEmpty()
-                MisasDropdown(
-                    label = "Estado",
-                    value = estados[selectedEstado].orEmpty(),
-                    expanded = estadoExpanded,
-                    onExpandedChange = { estadoExpanded = it },
-                    options = estados.map { (id, label) -> id to label },
-                    onSelect = { selectedEstado = it },
-                )
-            }
-            if (config.showTipoPlantilla && config.fixedTipoPlantilla == null && tiposPlantilla.isNotEmpty()) {
-                MisasDropdown(
-                    label = "Tipo plantilla",
-                    value = tiposPlantilla[selectedTipoPlantilla].orEmpty(),
-                    expanded = plantillaExpanded,
-                    onExpandedChange = { plantillaExpanded = it },
-                    options = tiposPlantilla.map { (id, label) -> id to label },
-                    onSelect = { selectedTipoPlantilla = it },
-                )
-            }
-            if (config.showOrden && ordenOpciones.isNotEmpty()) {
-                MisasDropdown(
-                    label = "Orden",
-                    value = ordenOpciones[selectedOrden].orEmpty(),
-                    expanded = ordenExpanded,
-                    onExpandedChange = { ordenExpanded = it },
-                    options = ordenOpciones.map { (id, label) -> id to label },
-                    onSelect = { selectedOrden = it },
-                )
-            }
-            if (config.showPeriodo) {
-                MisasDropdown(
-                    label = "Periodo",
-                    value = config.periodoOptions[selectedPeriodo].orEmpty(),
-                    expanded = periodoExpanded,
-                    onExpandedChange = { periodoExpanded = it },
-                    options = config.periodoOptions.map { (id, label) -> id to label },
-                    onSelect = { selectedPeriodo = it },
-                )
-            }
-            if (config.showVerCuadricula) {
-                Button(
-                    onClick = { reloadGrid() },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !loadingGrid && !applyingStatus && !mutating && selectedZonaId != null,
-                ) {
-                    Text("Ver cuadrícula")
+            MisasFilterPanel(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    MisasDropdown(
+                        label = "Zona",
+                        value = zonas[selectedZonaId].orEmpty(),
+                        expanded = zonaExpanded,
+                        onExpandedChange = { zonaExpanded = it },
+                        options = zonas.map { (id, label) -> id to label },
+                        onSelect = { selectedZonaId = it },
+                        modifier = Modifier.weight(1f),
+                    )
+                    MisasLegendButton { showLegend = true }
                 }
-            }
-            if (config.canPreparar) {
-                Button(
-                    onClick = { prepararPeriodo() },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !loadingGrid &&
-                        !mutating &&
-                        selectedZonaId != null &&
-                        selectedTipoPlantilla != null &&
-                        ctxCrear.isNotEmpty(),
-                ) {
-                    Text(if (mutating) "Preparando…" else "Preparar periodo")
+                if (config.showEstado) {
+                    val estados = statusPantalla?.estadosOpciones.orEmpty()
+                    MisasDropdown(
+                        label = "Estado",
+                        value = estados[selectedEstado].orEmpty(),
+                        expanded = estadoExpanded,
+                        onExpandedChange = { estadoExpanded = it },
+                        options = estados.map { (id, label) -> id to label },
+                        onSelect = { selectedEstado = it },
+                    )
                 }
-            }
-            if (config.applyStatus) {
-                Button(
-                    onClick = { applyNuevoStatus() },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !loadingGrid &&
-                        !applyingStatus &&
-                        selectedZonaId != null &&
-                        selectedEstado != null,
-                ) {
-                    Text(if (applyingStatus) "Aplicando…" else "Aplicar estado")
+                if (config.showTipoPlantilla && config.fixedTipoPlantilla == null && tiposPlantilla.isNotEmpty()) {
+                    MisasDropdown(
+                        label = "Tipo plantilla",
+                        value = tiposPlantilla[selectedTipoPlantilla].orEmpty(),
+                        expanded = plantillaExpanded,
+                        onExpandedChange = { plantillaExpanded = it },
+                        options = tiposPlantilla.map { (id, label) -> id to label },
+                        onSelect = { selectedTipoPlantilla = it },
+                    )
+                }
+                if (config.showOrden && ordenOpciones.isNotEmpty()) {
+                    MisasDropdown(
+                        label = "Orden",
+                        value = ordenOpciones[selectedOrden].orEmpty(),
+                        expanded = ordenExpanded,
+                        onExpandedChange = { ordenExpanded = it },
+                        options = ordenOpciones.map { (id, label) -> id to label },
+                        onSelect = { selectedOrden = it },
+                    )
+                }
+                if (config.showPeriodo) {
+                    MisasDropdown(
+                        label = "Periodo",
+                        value = config.periodoOptions[selectedPeriodo].orEmpty(),
+                        expanded = periodoExpanded,
+                        onExpandedChange = { periodoExpanded = it },
+                        options = config.periodoOptions.map { (id, label) -> id to label },
+                        onSelect = { selectedPeriodo = it },
+                    )
+                }
+                if (config.showVerCuadricula) {
+                    Button(
+                        onClick = { reloadGrid() },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !loadingGrid && !applyingStatus && !mutating && selectedZonaId != null,
+                    ) {
+                        Text("Ver cuadrícula")
+                    }
+                }
+                if (config.canPreparar) {
+                    Button(
+                        onClick = { prepararPeriodo() },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !loadingGrid &&
+                            !mutating &&
+                            selectedZonaId != null &&
+                            selectedTipoPlantilla != null &&
+                            ctxCrear.isNotEmpty(),
+                    ) {
+                        Text(if (mutating) "Preparando…" else "Preparar periodo")
+                    }
+                }
+                if (config.applyStatus) {
+                    Button(
+                        onClick = { applyNuevoStatus() },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !loadingGrid &&
+                            !applyingStatus &&
+                            selectedZonaId != null &&
+                            selectedEstado != null,
+                    ) {
+                        Text(if (applyingStatus) "Aplicando…" else "Aplicar estado")
+                    }
                 }
             }
         }
@@ -780,6 +796,8 @@ fun PlanDeMisasCuadriculaScreen(
             },
         )
     }
+
+    if (showLegend) CuadriculaLegendDialog(note = config.readOnlyNote, onDismiss = { showLegend = false })
 
     if (showImportDialog) {
         AlertDialog(

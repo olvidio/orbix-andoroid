@@ -105,10 +105,10 @@ fun fetchComunicacionActivSacd(
 }
 
 private fun parseComunicacionActivSacd(data: JSONObject): ComunicacionActivSacdResult {
-    val mensaje = data.optString("mensaje_periodo").takeIf { it.isNotEmpty() }
+    val mensaje = data.optStr("mensaje_periodo").takeIf { it.isNotEmpty() }
     return ComunicacionActivSacdResult(
-        periodoTxt = data.optString("periodo_txt", ""),
-        lugarFecha = data.optString("lugar_fecha", ""),
+        periodoTxt = data.optStr("periodo_txt", ""),
+        lugarFecha = data.optStr("lugar_fecha", ""),
         sacds = parseSacdList(data.optJSONArray("sacds")),
         sacdsPaso = parseSacdList(data.optJSONArray("sacds_paso")),
         mensajePeriodo = mensaje,
@@ -123,7 +123,7 @@ private fun parseSacdList(arr: JSONArray?): List<SacdComunicacion> {
         out.add(
             SacdComunicacion(
                 idNom = row.optInt("id_nom"),
-                nomAp = row.optString("nom_ap", ""),
+                nomAp = row.optStr("nom_ap", ""),
                 txt = jsonObjectToStringMap(row.optJSONObject("txt")),
                 actividades = parseActividades(row.optJSONArray("actividades")),
             ),
@@ -140,20 +140,20 @@ private fun parseActividades(arr: JSONArray?): List<ActividadComunicacion> {
         out.add(
             ActividadComunicacion(
                 propio = parsePropio(row.opt("propio")),
-                fIni = row.optString("f_ini", ""),
-                fFin = row.optString("f_fin", ""),
-                nombreUbi = row.optString("nombre_ubi", ""),
-                sfsv = row.optString("sfsv", ""),
-                actividad = row.optString("actividad", ""),
-                asistentes = row.optString("asistentes", ""),
-                encargado = row.optString("encargado", ""),
-                observ = row.optString("observ", "").let { v ->
+                fIni = row.optStr("f_ini", ""),
+                fFin = row.optStr("f_fin", ""),
+                nombreUbi = row.optStr("nombre_ubi", ""),
+                sfsv = row.optStr("sfsv", ""),
+                actividad = row.optStr("actividad", ""),
+                asistentes = row.optStr("asistentes", ""),
+                encargado = row.optStr("encargado", ""),
+                observ = row.optStr("observ", "").let { v ->
                     if (v == "null" || v.isEmpty()) "" else v
                 },
-                cargo = row.optString("cargo", "").let { v ->
+                cargo = row.optStr("cargo", "").let { v ->
                     if (v == "null" || v.isEmpty()) "" else v
                 },
-                nomTipo = row.optString("nom_tipo", ""),
+                nomTipo = row.optStr("nom_tipo", ""),
             ),
         )
     }

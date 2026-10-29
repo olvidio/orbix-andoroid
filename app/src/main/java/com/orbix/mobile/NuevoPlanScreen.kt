@@ -205,67 +205,69 @@ fun NuevoPlanScreen(
         }
 
         if (showFilters) {
-            MisasDropdown(
-                label = "Grupo de casas",
-                value = cdcOptions[selectedCdcSel].orEmpty(),
-                expanded = cdcExpanded,
-                onExpandedChange = { cdcExpanded = it },
-                options = cdcOptions.map { (id, label) -> id to label },
-                onSelect = { selectedCdcSel = it },
-            )
-            if (needsCasaPick) {
-                if (casasOpciones.isEmpty()) {
+            MisasFilterPanel {
+                MisasDropdown(
+                    label = "Grupo de casas",
+                    value = cdcOptions[selectedCdcSel].orEmpty(),
+                    expanded = cdcExpanded,
+                    onExpandedChange = { cdcExpanded = it },
+                    options = cdcOptions.map { (id, label) -> id to label },
+                    onSelect = { selectedCdcSel = it },
+                )
+                if (needsCasaPick) {
+                    if (casasOpciones.isEmpty()) {
+                        Text(
+                            "Cargando casas…",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        MisasDropdown(
+                            label = "Casa",
+                            value = casasOpciones[selectedCasaId].orEmpty(),
+                            expanded = casaExpanded,
+                            onExpandedChange = { casaExpanded = it },
+                            options = casasOpciones.map { (id, label) -> id to label },
+                            onSelect = { selectedCasaId = it },
+                        )
+                    }
+                }
+                MisasDropdown(
+                    label = "Periodo",
+                    value = periodoLabels[selectedPeriodo].orEmpty(),
+                    expanded = periodoExpanded,
+                    onExpandedChange = { periodoExpanded = it },
+                    options = periodoLabels.map { (id, label) -> id to label },
+                    onSelect = { selectedPeriodo = it },
+                )
+                MisasDropdown(
+                    label = "Año",
+                    value = selectedYear,
+                    expanded = yearExpanded,
+                    onExpandedChange = { yearExpanded = it },
+                    options = yearOptions,
+                    onSelect = { selectedYear = it },
+                )
+                Button(
+                    onClick = { sinActiv = !sinActiv },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                     Text(
-                        "Cargando casas…",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                } else {
-                    MisasDropdown(
-                        label = "Casa",
-                        value = casasOpciones[selectedCasaId].orEmpty(),
-                        expanded = casaExpanded,
-                        onExpandedChange = { casaExpanded = it },
-                        options = casasOpciones.map { (id, label) -> id to label },
-                        onSelect = { selectedCasaId = it },
+                        if (sinActiv) {
+                            "Incluir casas sin actividad: sí"
+                        } else {
+                            "Incluir casas sin actividad: no"
+                        },
                     )
                 }
-            }
-            MisasDropdown(
-                label = "Periodo",
-                value = periodoLabels[selectedPeriodo].orEmpty(),
-                expanded = periodoExpanded,
-                onExpandedChange = { periodoExpanded = it },
-                options = periodoLabels.map { (id, label) -> id to label },
-                onSelect = { selectedPeriodo = it },
-            )
-            MisasDropdown(
-                label = "Año",
-                value = selectedYear,
-                expanded = yearExpanded,
-                onExpandedChange = { yearExpanded = it },
-                options = yearOptions,
-                onSelect = { selectedYear = it },
-            )
-            Button(
-                onClick = { sinActiv = !sinActiv },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    if (sinActiv) {
-                        "Incluir casas sin actividad: sí"
-                    } else {
-                        "Incluir casas sin actividad: no"
-                    },
-                )
-            }
-            Button(
-                onClick = { buscar() },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !loadingResult && selectedCdcSel != null &&
-                    (!needsCasaPick || selectedCasaId != null),
-            ) {
-                Text("Ver planning")
+                Button(
+                    onClick = { buscar() },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !loadingResult && selectedCdcSel != null &&
+                        (!needsCasaPick || selectedCasaId != null),
+                ) {
+                    Text("Ver planning")
+                }
             }
         }
 

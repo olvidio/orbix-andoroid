@@ -4,12 +4,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Menu
@@ -32,6 +41,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.PaddingValues
@@ -70,96 +80,97 @@ fun OrbixShell(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(
-                modifier = Modifier.widthIn(max = 320.dp),
+                modifier = Modifier
+                    .padding(8.dp)
+                    .widthIn(max = 320.dp),
+                drawerShape = RoundedCornerShape(28.dp),
+                drawerContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             ) {
                 val drawerScroll = rememberScrollState()
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(drawerScroll),
-                ) {
-                    Text(
-                        text = title,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
-                        style = MaterialTheme.typography.titleLarge,
-                    )
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Filled.Home, contentDescription = null) },
-                        label = { Text("Inicio") },
-                        selected = selectedMenuId == null &&
-                            (singleGroup || selectedGroupId == null),
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            onSelectHome()
-                        },
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-
-                    if (menusLoading) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            CircularProgressIndicator()
-                        }
-                    } else if (menuGroups.isEmpty()) {
-                        Text(
-                            text = "No hay menús disponibles. Revisa la sesión e inténtalo de nuevo.",
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else if (singleGroup) {
-                        val group = menuGroups.first()
-                        Text(
-                            text = group.label,
-                            modifier = Modifier.padding(
-                                horizontal = 24.dp,
-                                vertical = 4.dp,
-                            ),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        DrawerMenuRows(
-                            rows = buildMenuDisplayRows(group.menus),
-                            selectedMenuId = selectedMenuId,
-                            onSelectMenu = { menu ->
-                                scope.launch { drawerState.close() }
-                                onSelectMenu(menu)
-                            },
-                        )
-                    } else {
-                        Text(
-                            text = "Apartados",
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        menuGroups.forEach { item ->
-                            NavigationDrawerItem(
-                                label = { Text(item.label) },
-                                selected = selectedGroupId == item.id,
-                                onClick = {
-                                    scope.launch { drawerState.close() }
-                                    onSelectGroup(item)
-                                },
-                            )
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("Aquinate", style = MaterialTheme.typography.titleMedium)
+                        IconButton(onClick = { scope.launch { drawerState.close() } }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Cerrar menú")
                         }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    HorizontalDivider()
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Filled.Logout, contentDescription = null) },
-                        label = { Text("Cerrar sesión") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            onLogout()
-                        },
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Column(modifier = Modifier.weight(1f).verticalScroll(drawerScroll)) {
+                        NavigationDrawerItem(
+                            modifier = Modifier.height(DrawerItemHeight),
+                            icon = { Icon(Icons.Filled.Home, contentDescription = null) },
+                            label = { Text("Inicio") },
+                            selected = selectedMenuId == null &&
+                                (singleGroup || selectedGroupId == null),
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                onSelectHome()
+                            },
+                        )
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                        if (menusLoading) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator()
+                            }
+                        } else if (menuGroups.isEmpty()) {
+                            Text(
+                                text = "No hay menús disponibles. Revisa la sesión e inténtalo de nuevo.",
+                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        } else if (singleGroup) {
+                            val group = menuGroups.first()
+                            DrawerMenuRows(
+                                rows = buildMenuDisplayRows(group.menus),
+                                selectedMenuId = selectedMenuId,
+                                onSelectMenu = { menu ->
+                                    scope.launch { drawerState.close() }
+                                    onSelectMenu(menu)
+                                },
+                            )
+                        } else {
+                            Text(
+                                text = "Apartados",
+                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            menuGroups.forEach { item ->
+                                NavigationDrawerItem(
+                                    modifier = Modifier.height(DrawerItemHeight),
+                                    label = { Text(item.label) },
+                                    selected = selectedGroupId == item.id,
+                                    onClick = {
+                                        scope.launch { drawerState.close() }
+                                        onSelectGroup(item)
+                                    },
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider()
+                        NavigationDrawerItem(
+                            modifier = Modifier.height(DrawerItemHeight),
+                            icon = { Icon(Icons.Filled.Logout, contentDescription = null) },
+                            label = { Text("Cerrar sesión") },
+                            selected = false,
+                            onClick = {
+                                scope.launch { drawerState.close() }
+                                onLogout()
+                            },
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
             }
         },
@@ -171,10 +182,16 @@ fun OrbixShell(
                     navigationIcon = {
                         IconButton(
                             onClick = { scope.launch { drawerState.open() } },
+                            modifier = Modifier
+                                .padding(start = 8.dp, end = 12.dp)
+                                .size(40.dp)
+                                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
+                                .border(4.dp, MaterialTheme.colorScheme.surfaceContainerLowest, CircleShape),
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Menu,
                                 contentDescription = "Menú",
+                                modifier = Modifier.size(26.dp),
                             )
                         }
                     },
@@ -193,6 +210,8 @@ fun OrbixShell(
     }
 }
 
+private val DrawerItemHeight = 44.dp
+
 @Composable
 private fun DrawerMenuRows(
     rows: List<MenuDisplayRow>,
@@ -204,21 +223,26 @@ private fun DrawerMenuRows(
             is MenuDisplayRow.Section -> {
                 Text(
                     text = row.title,
-                    modifier = Modifier.padding(
-                        start = (24 + row.depth * 16).dp,
-                        end = 24.dp,
-                        top = 10.dp,
-                        bottom = 2.dp,
-                    ),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = (12 + row.depth * 16).dp, end = 12.dp, top = 6.dp)
+                        .background(
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                            RoundedCornerShape(8.dp),
+                        )
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
             is MenuDisplayRow.Item -> {
                 NavigationDrawerItem(
                     label = { Text(row.menu.label) },
                     selected = selectedMenuId == row.menu.id,
-                    modifier = Modifier.padding(start = (row.depth * 16).dp),
+                    modifier = Modifier
+                        .padding(start = (row.depth * 16).dp)
+                        .height(DrawerItemHeight),
                     onClick = { onSelectMenu(row.menu) },
                 )
             }

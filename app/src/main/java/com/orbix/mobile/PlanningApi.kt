@@ -84,7 +84,7 @@ fun fetchPlanningZonesQuePage(
     val data = parseContestarDataObject(body) ?: return null
     return PlanningZonesQuePage(
         opcionesZonas = jsonObjectToStringMap(data.optJSONObject("opciones_zonas")),
-        error = data.optString("error").takeIf { it.isNotEmpty() },
+        error = data.optStr("error").takeIf { it.isNotEmpty() },
     )
 }
 
@@ -230,7 +230,7 @@ private fun parsePlanningZonesSelect(data: JSONObject): PlanningZonesSelectResul
 
     for (i in 1..zonasCount) {
         val key = i.toString()
-        val cabecera = cabeceras?.optString(key, "").orEmpty()
+        val cabecera = cabeceras?.optStr(key, "").orEmpty()
         val rawZona = actividades?.optJSONObject(key)
         blocks.add(
             PlanningZonaBlock(
@@ -241,9 +241,9 @@ private fun parsePlanningZonesSelect(data: JSONObject): PlanningZonesSelectResul
     }
 
     return PlanningZonesSelectResult(
-        titulo = data.optString("titulo", ""),
-        planningIniIso = data.optString("planning_ini_iso", ""),
-        planningFinIso = data.optString("planning_fin_iso", ""),
+        titulo = data.optStr("titulo", ""),
+        planningIniIso = data.optStr("planning_ini_iso", ""),
+        planningFinIso = data.optStr("planning_fin_iso", ""),
         zonas = blocks,
     )
 }
@@ -270,13 +270,13 @@ private fun parsePersonasZona(raw: JSONObject): List<PlanningPersona> {
 
 private fun parsePlanningActividad(row: JSONObject): PlanningActividad {
     return PlanningActividad(
-        nomCurt = row.optString("nom_curt", ""),
-        nomLlarg = row.optString("nom_llarg", ""),
-        fIni = row.optString("f_ini", ""),
-        hIni = row.optString("h_ini", ""),
-        fFi = row.optString("f_fi", ""),
-        hFi = row.optString("h_fi", ""),
-        css = row.optString("css", ""),
+        nomCurt = row.optStr("nom_curt", ""),
+        nomLlarg = row.optStr("nom_llarg", ""),
+        fIni = row.optStr("f_ini", ""),
+        hIni = row.optStr("h_ini", ""),
+        fFi = row.optStr("f_fi", ""),
+        hFi = row.optStr("h_fi", ""),
+        css = row.optStr("css", ""),
     )
 }
 
@@ -286,7 +286,7 @@ private fun jsonObjectToStringMap(obj: JSONObject?): Map<String, String> {
     val keys = obj.keys()
     while (keys.hasNext()) {
         val k = keys.next()
-        out[k] = obj.optString(k, k)
+        out[k] = obj.optStr(k, k)
     }
     return out
 }
@@ -375,7 +375,7 @@ fun fetchPlanningCasaQuePage(client: OkHttpClient, baseUrl: String): PlanningCas
     val data = parseContestarDataObject(body) ?: return null
     return PlanningCasaQuePage(
         filtroCasas = data.optJSONObject("filtro"),
-        modoCasas = data.optString("modo_casas", "all").ifEmpty { "all" },
+        modoCasas = data.optStr("modo_casas", "all").ifEmpty { "all" },
     )
 }
 

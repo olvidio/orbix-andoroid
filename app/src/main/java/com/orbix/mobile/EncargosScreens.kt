@@ -246,12 +246,6 @@ fun EncargosZonaScreen(
             .fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Encargos de la zona", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "Toca una fila para editar. Nuevo crea un encargo.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         if (loadingPage) {
             MisasLoadingBox()
             return@Column
@@ -277,30 +271,32 @@ fun EncargosZonaScreen(
             )
         }
         if (showFilters) {
-            MisasDropdown(
-                label = "Zona",
-                value = zonas[selectedZona].orEmpty(),
-                expanded = zonaExpanded,
-                onExpandedChange = { zonaExpanded = it },
-                options = zonas.map { (id, label) -> id to label },
-                onSelect = { selectedZona = it },
-            )
-            if (page?.ordenOpciones?.isNotEmpty() == true) {
+            MisasFilterPanel {
                 MisasDropdown(
-                    label = "Orden",
-                    value = page!!.ordenOpciones[selectedOrden].orEmpty(),
-                    expanded = ordenExpanded,
-                    onExpandedChange = { ordenExpanded = it },
-                    options = page!!.ordenOpciones.map { (id, label) -> id to label },
-                    onSelect = { selectedOrden = it },
+                    label = "Zona",
+                    value = zonas[selectedZona].orEmpty(),
+                    expanded = zonaExpanded,
+                    onExpandedChange = { zonaExpanded = it },
+                    options = zonas.map { (id, label) -> id to label },
+                    onSelect = { selectedZona = it },
                 )
-            }
-            Button(
-                onClick = { buscar() },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !loadingGrid,
-            ) {
-                Text("Ver listado")
+                if (page?.ordenOpciones?.isNotEmpty() == true) {
+                    MisasDropdown(
+                        label = "Orden",
+                        value = page!!.ordenOpciones[selectedOrden].orEmpty(),
+                        expanded = ordenExpanded,
+                        onExpandedChange = { ordenExpanded = it },
+                        options = page!!.ordenOpciones.map { (id, label) -> id to label },
+                        onSelect = { selectedOrden = it },
+                    )
+                }
+                Button(
+                    onClick = { buscar() },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !loadingGrid,
+                ) {
+                    Text("Ver listado")
+                }
             }
         }
         if (!showFilters && grid != null) {
@@ -669,12 +665,6 @@ fun EncargosCentrosScreen(
             .fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Encargos visibles por centro", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "Toca una fila para editar o eliminar el vínculo encargo↔centro.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         if (loadingPage) {
             MisasLoadingBox()
             return@Column
@@ -696,20 +686,22 @@ fun EncargosCentrosScreen(
             )
         }
         if (showFilters) {
-            MisasDropdown(
-                label = "Zona",
-                value = zonas[selectedZona].orEmpty(),
-                expanded = zonaExpanded,
-                onExpandedChange = { zonaExpanded = it },
-                options = zonas.map { (id, label) -> id to label },
-                onSelect = { selectedZona = it },
-            )
-            Button(
-                onClick = { buscar() },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !loadingGrid,
-            ) {
-                Text("Ver listado")
+            MisasFilterPanel {
+                MisasDropdown(
+                    label = "Zona",
+                    value = zonas[selectedZona].orEmpty(),
+                    expanded = zonaExpanded,
+                    onExpandedChange = { zonaExpanded = it },
+                    options = zonas.map { (id, label) -> id to label },
+                    onSelect = { selectedZona = it },
+                )
+                Button(
+                    onClick = { buscar() },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !loadingGrid,
+                ) {
+                    Text("Ver listado")
+                }
             }
         }
         if (!showFilters && grid != null) {

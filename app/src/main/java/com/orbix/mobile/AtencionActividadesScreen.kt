@@ -115,16 +115,6 @@ fun AtencionActividadesScreen(
             .fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(
-            "Atención actividades",
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Text(
-            "Lista para comunicar a los sacd (misma consulta que «buscar» en la web).",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
         val filterSummary = buildString {
             append(periodoActivLabels()[selectedPeriodo].orEmpty())
             append(" · ")
@@ -153,36 +143,38 @@ fun AtencionActividadesScreen(
         }
 
         if (showFilters) {
-            ActivPeriodoDropdown(
-                label = "Periodo",
-                value = periodoActivLabels()[selectedPeriodo].orEmpty(),
-                expanded = periodoExpanded,
-                onExpandedChange = { periodoExpanded = it },
-                options = periodoActivLabels().map { (id, label) -> id to label },
-                onSelect = {
-                    selectedPeriodo = it
-                    periodoExpanded = false
-                },
-            )
+            MisasFilterPanel {
+                ActivPeriodoDropdown(
+                    label = "Periodo",
+                    value = periodoActivLabels()[selectedPeriodo].orEmpty(),
+                    expanded = periodoExpanded,
+                    onExpandedChange = { periodoExpanded = it },
+                    options = periodoActivLabels().map { (id, label) -> id to label },
+                    onSelect = {
+                        selectedPeriodo = it
+                        periodoExpanded = false
+                    },
+                )
 
-            ActivPeriodoDropdown(
-                label = "Año",
-                value = selectedYear,
-                expanded = yearExpanded,
-                onExpandedChange = { yearExpanded = it },
-                options = yearOptions,
-                onSelect = {
-                    selectedYear = it
-                    yearExpanded = false
-                },
-            )
+                ActivPeriodoDropdown(
+                    label = "Año",
+                    value = selectedYear,
+                    expanded = yearExpanded,
+                    onExpandedChange = { yearExpanded = it },
+                    options = yearOptions,
+                    onSelect = {
+                        selectedYear = it
+                        yearExpanded = false
+                    },
+                )
 
-            Button(
-                onClick = { buscar() },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !loading,
-            ) {
-                Text("Buscar")
+                Button(
+                    onClick = { buscar() },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !loading,
+                ) {
+                    Text("Buscar")
+                }
             }
         }
 

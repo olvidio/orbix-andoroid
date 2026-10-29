@@ -71,7 +71,7 @@ fun fetchSacdSelectPage(
     val data = parseContestarDataObject(body) ?: return null
     return SacdSelectPage(
         opciones = jsonObjectToStringMap(data.optJSONObject("opciones")),
-        selected = data.opt("selected")?.toString().orEmpty(),
+        selected = data.opt("selected").jsonText(),
     )
 }
 
@@ -99,17 +99,17 @@ fun fetchSacdAusencias(
         rows.add(
             SacdAusenciaRow(
                 idEnc = row.optInt("id_enc", 0),
-                descEnc = row.optString("desc_enc", ""),
+                descEnc = row.optStr("desc_enc", ""),
                 idItem = row.optInt("id_item", 0),
-                inicio = row.optString("inicio").takeIf { it.isNotEmpty() },
-                fin = row.optString("fin").takeIf { it.isNotEmpty() },
-                dedicM = row.optString("dedic_m", ""),
-                dedicT = row.optString("dedic_t", ""),
-                dedicV = row.optString("dedic_v", ""),
+                inicio = row.optStr("inicio").takeIf { it.isNotEmpty() },
+                fin = row.optStr("fin").takeIf { it.isNotEmpty() },
+                dedicM = row.optStr("dedic_m", ""),
+                dedicT = row.optStr("dedic_t", ""),
+                dedicV = row.optStr("dedic_v", ""),
             ),
         )
     }
-    val ctxGuardar = data.optString("ctx_guardar", "")
+    val ctxGuardar = data.optStr("ctx_guardar", "")
     return SacdAusenciasResult(
         tiposDisponibles = tipos,
         rows = rows,
@@ -187,7 +187,7 @@ private fun jsonObjectToStringMap(obj: JSONObject?): Map<String, String> {
     val keys = obj.keys()
     while (keys.hasNext()) {
         val k = keys.next()
-        out[k] = obj.optString(k, k)
+        out[k] = obj.optStr(k, k)
     }
     return out
 }

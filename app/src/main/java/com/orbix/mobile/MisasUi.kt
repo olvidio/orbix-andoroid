@@ -6,12 +6,15 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -21,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -333,13 +337,38 @@ fun LocalTimeField(
     }
 }
 
+/** Ancho máximo de los filtros desplegados: no hace falta ocupar toda la pantalla. */
+private val FilterPanelMaxWidth = 440.dp
+
+/** Contenedor de filtros desplegados: centrado y con ancho acotado. */
+@Composable
+fun MisasFilterPanel(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+        Column(
+            modifier = Modifier.widthIn(max = FilterPanelMaxWidth).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            content = content,
+        )
+    }
+}
+
 @Composable
 fun MisasFilterSummaryBar(
     summary: String,
     onShowFilters: () -> Unit,
+    onShowLegend: (() -> Unit)? = null,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
+                RoundedCornerShape(8.dp),
+            )
+            .padding(start = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -349,10 +378,88 @@ fun MisasFilterSummaryBar(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
+        if (onShowLegend != null) MisasLegendButton(onShowLegend)
         IconButton(onClick = onShowFilters) {
             Icon(
                 imageVector = Icons.Filled.FilterList,
                 contentDescription = "Mostrar filtros",
+            )
+        }
+    }
+}
+
+@Composable
+fun MisasLegendButton(onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Icon(
+            imageVector = Icons.Filled.Info,
+            contentDescription = "Leyenda de colores",
+        )
+    }
+}
+
+@Composable
+fun MisasInfoDialog(title: String, text: String, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } },
+        title = { Text(title) },
+        text = { Text(text, style = MaterialTheme.typography.bodyMedium) },
+    )
+}
+
+private val cuadriculaLegendEstadoMisa = listOf(
+    "rojoclaro" to "Propuesta",
+    "amarilloclaro" to "Comunicado al sacerdote",
+    "verdeclaro" to "Comunicado al CTR",
+)
+
+private val cuadriculaLegendSacd = listOf(
+    "verdeclaro" to "Sin incidencias",
+    "verde" to "Sin misa ese día y está en la zona",
+    "azulclaro" to "Sin misa ese día y no está en la zona",
+    "amarillo" to "Dos misas ese día / no es de la zona",
+    "rojo" to "Más de dos misas, dos a primera hora o misa a primera hora fuera de la zona",
+)
+
+@Composable
+fun CuadriculaLegendDialog(note: String? = null, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } },
+        title = { Text("Leyenda") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                note?.let { MisasReadOnlyNote(it) }
+                CuadriculaLegendSection("Estado de la misa", cuadriculaLegendEstadoMisa)
+                CuadriculaLegendSection("Disponibilidad del sacerdote", cuadriculaLegendSacd)
+                Text(
+                    "En la cuadrícula de sacerdotes: SI/NO indica si está en la zona; «--» que está fuera.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+    )
+}
+
+@Composable
+private fun CuadriculaLegendSection(title: String, items: List<Pair<String, String>>) {
+    Text(title, style = MaterialTheme.typography.labelLarge)
+    items.forEach { (css, label) ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .background(cuadriculaCellBackground(css) ?: Color.Transparent),
+            )
+            Text(
+                label,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(start = 8.dp),
             )
         }
     }

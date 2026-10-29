@@ -7,10 +7,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -26,6 +28,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedButton
@@ -56,6 +63,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.rememberCoroutineScope
@@ -228,7 +236,10 @@ private fun OrbixApp(client: OkHttpClient, cookieJar: InMemoryCookieJar) {
     }
 
     val sectionTitle = selectedGroup?.label
-    val shellTitle = selectedMenu?.label ?: sectionTitle ?: "Orbix"
+    // Con un solo grupmenu su nombre (p. ej. «exterior») no aporta nada: se muestra «Inicio».
+    val shellTitle = selectedMenu?.label
+        ?: sectionTitle?.takeIf { !singleMenuGroup }
+        ?: "Inicio"
 
     BackHandler(enabled = selectedMenuId != null) {
         selectedMenuId = null
@@ -319,12 +330,7 @@ private fun OrbixApp(client: OkHttpClient, cookieJar: InMemoryCookieJar) {
                 )
             }
             else -> {
-                AuthenticatedHomeScreen(
-                    contentPadding = padding,
-                    drawerSectionTitle = sectionTitle,
-                    baseUrl = baseUrl,
-                    esquema = esquema,
-                )
+                AuthenticatedHomeScreen(contentPadding = padding)
             }
         }
     }
@@ -340,24 +346,21 @@ private fun AuthLoginScreen(
 ) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var showPassword by remember { mutableStateOf(false) }
     var totp by remember { mutableStateOf("") }
-    var log by remember { mutableStateOf("") }
+    var loginError by remember { mutableStateOf<String?>(null) }
+    var errorFields by remember { mutableStateOf(emptySet<LoginField>()) }
+    var loggingIn by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Orbix", style = MaterialTheme.typography.headlineSmall)
+            Text("Aquinate", style = MaterialTheme.typography.headlineSmall)
             TextButton(onClick = onOpenSettings) {
                 Text("Configuración")
             }
@@ -366,107 +369,166 @@ private fun AuthLoginScreen(
             "Versión ${BuildConfig.VERSION_NAME}",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.align(Alignment.BottomCenter),
         )
-        Text(
-            "Inicia sesión. Tras entrar verás el menú ☰ como en la web.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text("Conexión", style = MaterialTheme.typography.titleSmall)
-        if (baseUrl.isEmpty()) {
-            Text(
-                "Define la URL y el esquema en Configuración.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.error,
-            )
-        } else {
-            Text(
-                baseUrl,
-                style = MaterialTheme.typography.bodyMedium,
-                fontFamily = FontFamily.Monospace,
-            )
-            Text(
-                "Esquema: ${esquema.ifEmpty { "(vacío — usar el del servidor)" }}",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        OutlinedTextField(
-            value = username,
-            onValueChange = { username = it },
-            label = { Text("Usuario") },
+        Column(
             modifier = Modifier
+                .align(Alignment.Center)
+                .padding(vertical = 56.dp)
+                .widthIn(max = 360.dp)
                 .fillMaxWidth()
-                .tabToNextFocus(focusManager),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-            keyboardActions = KeyboardActions(
-                onNext = { focusManager.moveFocus(FocusDirection.Next) },
-            ),
-        )
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Contraseña") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .tabToNextFocus(focusManager),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-            keyboardActions = KeyboardActions(
-                onNext = { focusManager.moveFocus(FocusDirection.Next) },
-            ),
-        )
-        OutlinedTextField(
-            value = totp,
-            onValueChange = { totp = it },
-            label = { Text("Código 2FA (si aplica)") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .tabToNextFocus(focusManager),
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(
-                onDone = { focusManager.clearFocus() },
-            ),
-        )
-        Button(
-            onClick = {
-                if (baseUrl.isEmpty()) {
-                    log = "Configura primero la URL en Configuración."
-                    return@Button
-                }
-                scope.launch {
-                    log = "…"
-                    val result = withContext(Dispatchers.IO) {
-                        runLogin(
-                            client,
-                            baseUrl.trim(),
-                            username,
-                            password,
-                            esquema.trim(),
-                            totp.trim(),
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (baseUrl.isEmpty()) {
+                Text(
+                    "Define la URL y el esquema en Configuración.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            OutlinedTextField(
+                value = username,
+                onValueChange = {
+                    username = it
+                    errorFields = errorFields - LoginField.Usuario
+                },
+                isError = LoginField.Usuario in errorFields,
+                label = { Text("Usuario") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .tabToNextFocus(focusManager),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(
+                    onNext = { focusManager.moveFocus(FocusDirection.Next) },
+                ),
+            )
+            OutlinedTextField(
+                value = password,
+                onValueChange = {
+                    password = it
+                    errorFields = errorFields - LoginField.Password
+                },
+                isError = LoginField.Password in errorFields,
+                label = { Text("Contraseña") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .tabToNextFocus(focusManager),
+                singleLine = true,
+                visualTransformation = if (showPassword) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
+                trailingIcon = {
+                    IconButton(onClick = { showPassword = !showPassword }) {
+                        Icon(
+                            imageVector = if (showPassword) {
+                                Icons.Filled.VisibilityOff
+                            } else {
+                                Icons.Filled.Visibility
+                            },
+                            contentDescription = if (showPassword) {
+                                "Ocultar contraseña"
+                            } else {
+                                "Mostrar contraseña"
+                            },
                         )
                     }
-                    log = result.log
-                    if (result.succeeded) {
-                        val sessionOk = withContext(Dispatchers.IO) {
-                            fetchSessionAuthenticated(client, baseUrl.trim())
+                },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Next,
+                ),
+                keyboardActions = KeyboardActions(
+                    onNext = { focusManager.moveFocus(FocusDirection.Next) },
+                ),
+            )
+            OutlinedTextField(
+                value = totp,
+                onValueChange = {
+                    totp = it
+                    errorFields = errorFields - LoginField.Codigo
+                },
+                isError = LoginField.Codigo in errorFields,
+                label = { Text("Código 2FA (si aplica)") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .tabToNextFocus(focusManager),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(
+                    onDone = { focusManager.clearFocus() },
+                ),
+            )
+            Button(
+                onClick = {
+                    loginError = null
+                    errorFields = emptySet()
+                    if (baseUrl.isEmpty()) {
+                        loginError = "Configura primero la URL en Configuración."
+                        return@Button
+                    }
+                    val missing = buildSet {
+                        if (username.isBlank()) add(LoginField.Usuario)
+                        if (password.isEmpty()) add(LoginField.Password)
+                    }
+                    if (missing.isNotEmpty()) {
+                        errorFields = missing
+                        loginError = when {
+                            missing.size == 2 -> "Introduce el usuario y la contraseña."
+                            LoginField.Usuario in missing -> "Introduce el usuario."
+                            else -> "Introduce la contraseña."
                         }
-                        if (sessionOk) {
-                            onLoginSuccess()
-                        } else {
-                            log = result.log + "\n\nEl login respondió bien, pero la sesión no se mantiene " +
-                                "(falta enviar la cookie PHPSESSID en la siguiente petición). " +
-                                "Reinstala la app y vuelve a probar; si sigue igual, revisa Logcat."
+                        return@Button
+                    }
+                    scope.launch {
+                        loggingIn = true
+                        try {
+                            val result = withContext(Dispatchers.IO) {
+                                runLogin(
+                                    client,
+                                    baseUrl.trim(),
+                                    username,
+                                    password,
+                                    esquema.trim(),
+                                    totp.trim(),
+                                )
+                            }
+                            if (BuildConfig.DEBUG) Log.d("OrbixApi", result.log)
+                            if (result.succeeded) {
+                                val sessionOk = withContext(Dispatchers.IO) {
+                                    fetchSessionAuthenticated(client, baseUrl.trim())
+                                }
+                                if (sessionOk) {
+                                    onLoginSuccess()
+                                } else {
+                                    loginError = "Has entrado, pero la sesión no se mantiene. " +
+                                        "Reinstala la app y vuelve a probar."
+                                }
+                            } else {
+                                loginError = result.message
+                                errorFields = result.fields
+                            }
+                        } finally {
+                            loggingIn = false
                         }
                     }
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Iniciar sesión") }
-        Text("Respuesta", style = MaterialTheme.typography.labelLarge)
-        Text(log, fontFamily = FontFamily.Monospace, modifier = Modifier.fillMaxWidth())
+                },
+                enabled = !loggingIn,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(if (loggingIn) "Entrando…" else "Iniciar sesión") }
+            loginError?.let {
+                Text(
+                    it,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
     }
 }
 
@@ -608,46 +670,18 @@ private fun UnimplementedMenuScreen(
 }
 
 @Composable
-private fun AuthenticatedHomeScreen(
-    contentPadding: PaddingValues,
-    drawerSectionTitle: String?,
-    baseUrl: String,
-    esquema: String,
-) {
+private fun AuthenticatedHomeScreen(contentPadding: PaddingValues) {
     Column(
         modifier = Modifier
             .padding(contentPadding)
             .padding(16.dp)
             .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            "Sesión iniciada",
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Text(
-            baseUrl,
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
+            "Toca el icono ☰ de arriba a la izquierda para ver los menús.",
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        if (drawerSectionTitle != null) {
-            Text(
-                text = "Apartado: $drawerSectionTitle",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-                "Aquí puedes enlazar pantallas nativas o la web para este grupo.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else {
-            Text(
-                "Usa el menú ☰ para elegir una opción o cerrar sesión.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
     }
 }
 
@@ -726,7 +760,38 @@ private fun SettingsScreen(
     }
 }
 
-private data class LoginHttpResult(val log: String, val succeeded: Boolean)
+private enum class LoginField { Usuario, Password, Codigo }
+
+/** `log` es el detalle técnico (solo para Logcat); `message` es lo que ve el usuario. */
+private data class LoginHttpResult(
+    val log: String,
+    val succeeded: Boolean,
+    val message: String = "",
+    val fields: Set<LoginField> = emptySet(),
+)
+
+/** Traduce el `code` de `app_login` (AppMobileLogin) a un aviso claro y los campos afectados. */
+private fun loginFailure(log: String, httpCode: Int, bodyStr: String): LoginHttpResult {
+    val env = parseSrcEnvelope(bodyStr)
+    val code = env?.dataObject?.optStr("code", "").orEmpty()
+    val (msg, fields) = when (code) {
+        "missing_credentials" -> "Introduce el usuario y la contraseña." to
+            setOf(LoginField.Usuario, LoginField.Password)
+        "invalid_credentials" -> "Usuario o contraseña incorrectos." to
+            setOf(LoginField.Usuario, LoginField.Password)
+        "need_2fa" -> "Introduce el código 2FA." to setOf(LoginField.Codigo)
+        "invalid_2fa" -> "El código 2FA no es correcto." to setOf(LoginField.Codigo)
+        "need_2fa_setup" -> "Debes completar la configuración 2FA en la web antes de entrar." to
+            emptySet()
+        "dmz_denied" -> "Este usuario no tiene acceso permitido." to emptySet()
+        "invalid_schema", "invalid_schema_env", "missing_schema" ->
+            "El esquema no es válido. Revísalo en Configuración." to emptySet()
+        "server_error" -> "Error del servidor. Inténtalo más tarde." to emptySet()
+        else -> (env?.mensaje?.takeIf { it.isNotBlank() }
+            ?: "Respuesta inesperada del servidor (HTTP $httpCode).") to emptySet()
+    }
+    return LoginHttpResult(log, false, msg, fields)
+}
 
 private fun runLogin(
     client: OkHttpClient,
@@ -737,7 +802,7 @@ private fun runLogin(
     verificationCode: String,
 ): LoginHttpResult {
     val url = buildIndexSrcGetUrl(baseUrl.trim(), "/src/usuarios/app_login")
-        ?: return LoginHttpResult("URL inválida", false)
+        ?: return LoginHttpResult("URL inválida", false, "La URL del servidor no es válida. Revísala en Configuración.")
     val json = buildString {
         append("{\"username\":").append(jsonQuote(username))
         append(",\"password\":").append(jsonQuote(password))
@@ -752,7 +817,7 @@ private fun runLogin(
             val bodyStr = r.body?.string().orEmpty()
             val text = "POST $url\nHTTP ${r.code}\n$bodyStr"
             val ok = r.isSuccessful && isContestarJsonSuccess(bodyStr)
-            LoginHttpResult(text, ok)
+            if (ok) LoginHttpResult(text, true) else loginFailure(text, r.code, bodyStr)
         }
     } catch (e: IOException) {
         val hint =
@@ -763,7 +828,11 @@ private fun runLogin(
             } else {
                 ""
             }
-        LoginHttpResult("${e.javaClass.simpleName}: ${e.message}$hint", false)
+        LoginHttpResult(
+            log = "${e.javaClass.simpleName}: ${e.message}$hint",
+            succeeded = false,
+            message = "No se pudo conectar con el servidor. Revisa la conexión y la URL en Configuración.",
+        )
     }
 }
 
