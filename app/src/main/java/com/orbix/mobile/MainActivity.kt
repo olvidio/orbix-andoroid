@@ -773,7 +773,19 @@ private data class LoginHttpResult(
 /** Traduce el `code` de `app_login` (AppMobileLogin) a un aviso claro y los campos afectados. */
 private fun loginFailure(log: String, httpCode: Int, bodyStr: String): LoginHttpResult {
     val env = parseSrcEnvelope(bodyStr)
-    val code = env?.dataObject?.optStr("code", "").orEmpty()
+    if (env == null) {
+        val fatal = bodyStr.contains("Fatal error", ignoreCase = true) ||
+            bodyStr.contains("Exception", ignoreCase = true)
+        val msg = if (fatal) {
+            "El servidor devolvió un error interno (HTTP $httpCode, respuesta no JSON). " +
+                "Avisa al administrador: revisa el esquema y la configuración del servidor."
+        } else {
+            "El servidor devolvió una respuesta que no es JSON (HTTP $httpCode). " +
+                "Revisa la URL y el esquema en Configuración."
+        }
+        return LoginHttpResult("$log\n[no JSON] ${bodyStr.take(300)}", false, msg)
+    }
+    val code = env.dataObject?.optStr("code", "").orEmpty()
     val (msg, fields) = when (code) {
         "missing_credentials" -> "Introduce el usuario y la contraseña." to
             setOf(LoginField.Usuario, LoginField.Password)
@@ -787,7 +799,7 @@ private fun loginFailure(log: String, httpCode: Int, bodyStr: String): LoginHttp
         "invalid_schema", "invalid_schema_env", "missing_schema" ->
             "El esquema no es válido. Revísalo en Configuración." to emptySet()
         "server_error" -> "Error del servidor. Inténtalo más tarde." to emptySet()
-        else -> (env?.mensaje?.takeIf { it.isNotBlank() }
+        else -> (env.mensaje.takeIf { it.isNotBlank() }
             ?: "Respuesta inesperada del servidor (HTTP $httpCode).") to emptySet()
     }
     return LoginHttpResult(log, false, msg, fields)
