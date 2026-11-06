@@ -208,7 +208,7 @@ private fun OrbixApp(client: OkHttpClient, cookieJar: InMemoryCookieJar) {
     if (showSettings) {
         BackHandler { showSettings = false }
         SettingsScreen(
-            initialBaseUrl = baseUrl,
+            initialBaseUrl = OrbixPrefs.getStoredBaseUrl(context),
             initialEsquema = esquema,
             onBack = { showSettings = false },
             onSave = { url, esq ->

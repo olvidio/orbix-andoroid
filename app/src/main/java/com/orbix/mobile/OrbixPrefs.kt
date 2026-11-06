@@ -8,6 +8,13 @@ object OrbixPrefs {
     private const val K_BASE_URL = "base_url"
     private const val K_ESQUEMA = "esquema"
 
+    /** URL tal como la escribió el usuario (sin esquema añadido); es la que se muestra en Configuración. */
+    fun getStoredBaseUrl(context: Context): String =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(K_BASE_URL, null)
+            ?.trim()
+            .orEmpty()
+
     /** URL base guardada, con el esquema añadido a la ruta si falta (ver [withEsquemaInPath]). */
     fun getBaseUrl(context: Context): String =
         withEsquemaInPath(

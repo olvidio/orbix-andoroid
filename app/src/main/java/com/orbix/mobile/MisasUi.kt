@@ -19,6 +19,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -493,6 +495,29 @@ fun MisasLoadingBox() {
     }
 }
 
+/** Fondo de fila alterno muy suave (cebra) para tablas. */
+@Composable
+private fun stripeColor(index: Int): Color =
+    if (index % 2 == 1) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surface
+
+/** Línea fina inferior para separar filas (sin líneas verticales). */
+@Composable
+private fun Modifier.rowDivider(): Modifier {
+    val c = MaterialTheme.colorScheme.outlineVariant
+    return this.drawBehind {
+        drawLine(c, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 1f)
+    }
+}
+
+/** Línea fina vertical a la derecha de la celda. */
+@Composable
+private fun Modifier.colDivider(): Modifier {
+    val c = MaterialTheme.colorScheme.outlineVariant
+    return this.drawBehind {
+        drawLine(c, Offset(size.width, 0f), Offset(size.width, size.height), strokeWidth = 1f)
+    }
+}
+
 @Composable
 fun CuadriculaTable(
     grid: CuadriculaZona,
@@ -506,7 +531,7 @@ fun CuadriculaTable(
 
     LazyColumn(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(1.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         item(key = "cuadricula-header") {
             CuadriculaHeaderRow(
@@ -517,23 +542,26 @@ fun CuadriculaTable(
                 columnHeaders = grid.columnHeaders,
             )
         }
-        itemsIndexed(grid.rows, key = { index, _ -> "cuadricula-row-$index" }) { _, row ->
+        itemsIndexed(grid.rows, key = { index, _ -> "cuadricula-row-$index" }) { index, row ->
+            val stripe = stripeColor(index)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(horizontalScroll),
+                    .horizontalScroll(horizontalScroll)
+                    .rowDivider(),
             ) {
                 val encargoBg = cuadriculaCellBackground(row.encargoColorClass)
                     ?: if (row.isTitle) {
                         cuadriculaCellBackground("titulo")
                             ?: MaterialTheme.colorScheme.surfaceVariant
                     } else {
-                        MaterialTheme.colorScheme.surface
+                        stripe
                     }
                 Box(
                     modifier = Modifier
                         .width(encargoWidth)
                         .background(encargoBg)
+                        .colDivider()
                         .padding(6.dp),
                 ) {
                     Text(
@@ -552,7 +580,7 @@ fun CuadriculaTable(
                         } else if (row.isTitle) {
                             cuadriculaCellBackground("titulo") ?: MaterialTheme.colorScheme.surfaceVariant
                         } else {
-                            MaterialTheme.colorScheme.surface
+                            stripe
                         }
                     Box(
                         modifier = Modifier
@@ -565,6 +593,7 @@ fun CuadriculaTable(
                                     Modifier
                                 },
                             )
+                            .colDivider()
                             .padding(6.dp),
                     ) {
                         Text(
@@ -614,7 +643,8 @@ private fun CuadriculaHeaderRow(
         Box(
             modifier = Modifier
                 .width(encargoWidth)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .colDivider()
                 .padding(6.dp),
         ) {
             Text("Encargo", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
@@ -624,6 +654,7 @@ private fun CuadriculaHeaderRow(
                 modifier = Modifier
                     .width(cellWidth)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .colDivider()
                     .padding(6.dp),
             ) {
                 Text(
@@ -666,7 +697,7 @@ fun PlanCtrGridTable(
         }
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(1.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             item {
                 Row(
@@ -677,7 +708,8 @@ fun PlanCtrGridTable(
                     Box(
                         modifier = Modifier
                             .width(encargoWidth)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .colDivider()
                             .padding(6.dp),
                     ) {
                         Text("Encargo", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
@@ -686,7 +718,8 @@ fun PlanCtrGridTable(
                         Box(
                             modifier = Modifier
                                 .width(cellWidth)
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                                .colDivider()
                                 .padding(6.dp),
                         ) {
                             Text(
@@ -699,15 +732,19 @@ fun PlanCtrGridTable(
                     }
                 }
             }
-            items(rows, key = { it.descEnc + it.cells.hashCode() }) { row ->
+            itemsIndexed(rows, key = { _, it -> it.descEnc + it.cells.hashCode() }) { index, row ->
+                val stripe = stripeColor(index)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(horizontalScroll),
+                        .horizontalScroll(horizontalScroll)
+                        .rowDivider(),
                 ) {
                     Box(
                         modifier = Modifier
                             .width(encargoWidth)
+                            .background(stripe)
+                            .colDivider()
                             .padding(6.dp),
                     ) {
                         Text(row.descEnc, style = MaterialTheme.typography.bodySmall)
@@ -716,6 +753,8 @@ fun PlanCtrGridTable(
                         Box(
                             modifier = Modifier
                                 .width(cellWidth)
+                                .background(stripe)
+                                .colDivider()
                                 .padding(6.dp),
                         ) {
                             Text(
@@ -743,7 +782,7 @@ fun SimpleRowsTable(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(1.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
     ) {
         item {
             Row(
@@ -755,7 +794,8 @@ fun SimpleRowsTable(
                     Box(
                         modifier = Modifier
                             .width(width)
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .colDivider()
                             .padding(6.dp),
                     ) {
                         Text(header, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall)
@@ -765,15 +805,19 @@ fun SimpleRowsTable(
         }
         items(rows.size) { index ->
             val row = rows[index]
+            val stripe = stripeColor(index)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(horizontalScroll),
+                    .horizontalScroll(horizontalScroll)
+                    .rowDivider(),
             ) {
                 columnKeys.forEach { key ->
                     Box(
                         modifier = Modifier
                             .width(width)
+                            .background(stripe)
+                            .colDivider()
                             .padding(6.dp),
                     ) {
                         Text(

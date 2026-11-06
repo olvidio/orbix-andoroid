@@ -246,7 +246,7 @@ fun VerPlanCtrScreen(
             }
             if (showFilters) {
                 MisasFilterPanel {
-                    if (p.zonasOpciones.isNotEmpty()) {
+                    if (p.zonasOpciones.size > 1) {
                         MisasDropdown(
                             label = "Zona",
                             value = p.zonasOpciones[selectedZona].orEmpty(),
@@ -259,14 +259,21 @@ fun VerPlanCtrScreen(
                             },
                         )
                     }
-                    MisasDropdown(
-                        label = "Centro",
-                        value = p.centrosOpciones[selectedCentro].orEmpty(),
-                        expanded = centroExpanded,
-                        onExpandedChange = { centroExpanded = it },
-                        options = p.centrosOpciones.map { (id, label) -> id to label },
-                        onSelect = { selectedCentro = it },
-                    )
+                    if (p.centrosOpciones.size == 1) {
+                        Text(
+                            p.centrosOpciones.values.first(),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    } else {
+                        MisasDropdown(
+                            label = "Centro",
+                            value = p.centrosOpciones[selectedCentro].orEmpty(),
+                            expanded = centroExpanded,
+                            onExpandedChange = { centroExpanded = it },
+                            options = p.centrosOpciones.map { (id, label) -> id to label },
+                            onSelect = { selectedCentro = it },
+                        )
+                    }
                     MisasDropdown(
                         label = "Periodo",
                         value = periodoOptions[selectedPeriodo].orEmpty(),
